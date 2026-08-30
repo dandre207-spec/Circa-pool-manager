@@ -1,0 +1,3172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Circa Pool">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1117">
+<title>Circa Pool Manager</title>
+<style>
+/* ═══ THEME VARIABLES ═══ */
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #1c2333; --bg4: #21262d;
+  --border: #30363d; --border2: #484f58;
+  --text: #e6edf3; --text2: #8b949e; --text3: #484f58;
+  --gold: #ffd700; --gold2: #b8960c; --gold-bg: rgba(255,215,0,.12);
+  --green: #2ea043; --green-bg: rgba(46,160,67,.12);
+  --red: #f85149; --red-bg: rgba(248,81,73,.12);
+  --blue: #58a6ff; --blue-bg: rgba(88,166,255,.12);
+  --purple: #bc8cff; --purple-bg: rgba(188,140,255,.12);
+  --orange: #d29922; --orange-bg: rgba(210,153,34,.12);
+  --radius: 8px; --radius-sm: 5px;
+  --shadow: 0 2px 12px rgba(0,0,0,.3);
+  --font: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+[data-theme="light"] {
+  --bg: #f6f8fa; --bg2: #ffffff; --bg3: #f0f2f5; --bg4: #e8ebef;
+  --border: #d0d7de; --border2: #afb8c1;
+  --text: #1f2328; --text2: #656d76; --text3: #afb8c1;
+  --shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+
+/* ═══ RESET ═══ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;font-size:14px;padding-top:env(safe-area-inset-top,0)}
+a{color:var(--blue);text-decoration:none}
+
+/* ═══ LAYOUT ═══ */
+.app-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px}
+.header-brand{font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--gold),#ffed8a);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.header-disclaimer{font-size:10px;color:var(--text3);max-width:200px;line-height:1.3}
+
+.app-nav{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;scrollbar-width:none}
+.app-nav::-webkit-scrollbar{display:none}
+.nav-btn{background:none;border:none;color:var(--text2);padding:11px 16px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:.2s}
+.nav-btn:hover{color:var(--text);background:var(--bg3)}
+.nav-btn.active{color:var(--gold);border-bottom-color:var(--gold);background:var(--gold-bg)}
+.mobile-menu-btn{display:none;background:none;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);cursor:pointer;font-size:18px}
+
+.main-content{max-width:1200px;margin:0 auto;padding:20px}
+.section{display:none}
+.section.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ═══ COMPONENTS ═══ */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.card-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.card-sub{font-size:12px;color:var(--text2);margin-bottom:14px}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat-tile{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center}
+.stat-val{font-size:26px;font-weight:800;color:var(--gold)}
+.stat-lbl{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
+
+.btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#ffed8a);color:#000}
+.btn-gold:hover{box-shadow:0 2px 8px rgba(255,215,0,.3)}
+.btn-green{background:var(--green);color:#fff}
+.btn-red{background:var(--red);color:#fff}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap}
+
+select,input[type="text"],input[type="number"],input[type="time"],textarea{
+  background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;font-family:var(--font);width:100%}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-bg)}
+label{font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:4px}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
+.form-group{margin-bottom:12px}
+textarea{resize:vertical;min-height:60px}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-win{background:var(--green-bg);color:var(--green)}
+.badge-loss{background:var(--red-bg);color:var(--red)}
+.badge-push{background:var(--gold-bg);color:var(--gold)}
+.badge-pending{background:var(--blue-bg);color:var(--blue)}
+.badge-open{background:var(--green-bg);color:var(--green)}
+.badge-locked{background:var(--red-bg);color:var(--red)}
+.badge-finalized{background:var(--purple-bg);color:var(--purple)}
+.badge-due{background:var(--orange-bg);color:var(--orange)}
+.badge-draft{background:var(--blue-bg);color:var(--blue)}
+.badge-approved{background:var(--green-bg);color:var(--green)}
+
+.alert{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:14px;font-size:13px;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.alert-info{background:var(--blue-bg);border:1px solid rgba(88,166,255,.25);color:var(--blue)}
+.alert-gold{background:var(--gold-bg);border:1px solid var(--gold2);color:var(--gold)}
+.alert-warn{background:var(--orange-bg);border:1px solid var(--orange);color:var(--orange)}
+.alert-success{background:var(--green-bg);border:1px solid var(--green);color:var(--green)}
+.alert-error{background:var(--red-bg);border:1px solid var(--red);color:var(--red)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--text2);border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;cursor:pointer}
+th:hover{color:var(--gold)}
+td{padding:10px 12px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--bg3)}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
+
+.top5-highlight{background:var(--gold-bg) !important}
+.tie-indicator{color:var(--orange);font-weight:700;font-size:11px}
+.member-dot{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:10px;font-weight:700;line-height:22px;text-align:center;color:#000;margin-right:3px}
+
+.entry-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.entry-card.locked{border-color:var(--red);background:var(--red-bg)}
+.entry-card.finalized{border-color:var(--purple);background:var(--purple-bg)}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--text2)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+
+.countdown{font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px}
+.countdown-open{background:var(--green-bg);color:var(--green)}
+.countdown-due{background:var(--orange-bg);color:var(--orange)}
+.countdown-locked{background:var(--red-bg);color:var(--red)}
+
+.week-select{width:auto;min-width:100px;font-weight:600;color:var(--gold);background:var(--bg)}
+
+.toast-container{position:fixed;top:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;box-shadow:var(--shadow);animation:toastIn .3s ease;max-width:360px}
+.toast-success{background:var(--green);color:#fff}
+.toast-error{background:var(--red);color:#fff}
+.toast-info{background:var(--blue);color:#fff}
+.toast-warn{background:var(--orange);color:#fff}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:600px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow)}
+.modal-lg{max-width:800px}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:16px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+.divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+.flex-between{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.flex-center{display:flex;align-items:center;gap:8px}
+.text-gold{color:var(--gold)}.text-green{color:var(--green)}.text-red{color:var(--red)}.text-dim{color:var(--text2)}
+.fw-700{font-weight:700}.fs-sm{font-size:12px}.fs-xs{font-size:11px}
+.mb-8{margin-bottom:8px}.mb-16{margin-bottom:16px}.mt-8{margin-top:8px}.mt-16{margin-top:16px}
+
+.pick-grid-table td select{min-width:140px}
+.pick-weight{font-size:11px;color:var(--gold);font-weight:700}
+.pick-spread{font-size:11px;color:var(--text2)}
+.duplicate-warn{border-color:var(--red) !important;box-shadow:0 0 0 2px var(--red-bg) !important}
+.completion-icon{font-size:16px}
+
+.bar-chart{display:flex;align-items:flex-end;gap:4px;height:80px}
+.bar{background:var(--gold);border-radius:2px 2px 0 0;min-width:20px;transition:height .3s}
+.bar-label{font-size:9px;color:var(--text2);text-align:center;margin-top:2px;overflow:hidden}
+
+.heatmap-cell{padding:6px 8px;text-align:center;font-size:12px;font-weight:600;border-radius:3px}
+
+.override-banner{background:var(--orange-bg);border:1px solid var(--orange);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:12px;font-size:12px;color:var(--orange);display:flex;align-items:center;gap:8px}
+
+.activity-item{padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;display:flex;gap:8px}
+.activity-time{color:var(--text3);white-space:nowrap;min-width:130px}
+
+.copy-btn{cursor:pointer;background:var(--bg);border:1px solid var(--border);color:var(--text2);padding:4px 8px;border-radius:var(--radius-sm);font-size:11px}
+.copy-btn:hover{color:var(--gold);border-color:var(--gold)}
+
+.progress-ring{width:40px;height:40px}
+
+/* ═══ RESPONSIVE ═══ */
+/* ═══ MOBILE BOTTOM NAV BAR ═══ */
+.mobile-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:200;padding:0;padding-bottom:env(safe-area-inset-bottom,0)}
+.mobile-bottom-nav .mob-tabs{display:flex;justify-content:space-around;align-items:stretch}
+.mob-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 2px 6px;flex:1;border:none;background:none;color:var(--text2);font-size:10px;font-weight:500;cursor:pointer;gap:2px;min-height:52px;-webkit-tap-highlight-color:transparent}
+.mob-tab .mob-ico{font-size:20px;line-height:1}
+.mob-tab.active{color:var(--gold)}
+.mob-tab.active .mob-ico{filter:drop-shadow(0 0 4px rgba(255,215,0,.4))}
+.mob-more-panel{display:none;position:fixed;bottom:52px;bottom:calc(52px + env(safe-area-inset-bottom,0));left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);padding:8px;z-index:199;animation:slideUp .2s ease}
+.mob-more-panel.open{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.mob-more-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);padding:12px 6px;font-size:12px;text-align:center;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:center;gap:4px}
+.mob-more-btn.active{border-color:var(--gold);color:var(--gold);background:var(--gold-bg)}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+/* ═══ MOBILE GAME CARDS (replaces tables on small screens) ═══ */
+.game-cards{display:none}
+.game-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px}
+.game-card-matchup{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.game-card-team{font-weight:700;font-size:16px}
+.game-card-at{color:var(--text3);font-size:12px;padding:0 6px}
+.game-card-lines{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.game-card-line{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;text-align:center}
+.game-card-line-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.game-card-line-val{font-size:16px;font-weight:700}
+.game-card-meta{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text3)}
+
+@media(max-width:768px){
+  .app-header{padding:8px 12px}
+  .header-brand{font-size:16px}
+  .mobile-menu-btn{display:none}
+  .app-nav{display:none !important}
+  .mobile-bottom-nav{display:block}
+  .main-content{padding:10px;padding-bottom:calc(70px + env(safe-area-inset-bottom,0))}
+  .form-row{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .card{padding:14px}
+  .header-disclaimer{display:none}
+  select,input[type="text"],input[type="number"],input[type="time"],textarea{font-size:16px;padding:10px 12px}
+  .btn{padding:10px 16px;font-size:14px;min-height:44px}
+  .btn-sm{min-height:40px;padding:8px 12px;font-size:13px}
+  .btn-group{flex-direction:column}
+  .btn-group .btn{width:100%;justify-content:center}
+  table{font-size:12px}
+  th,td{padding:8px 6px}
+  .entry-card{padding:12px}
+  .modal{padding:16px;width:95%}
+  .stat-tile{padding:12px}
+  .stat-val{font-size:22px}
+  .toast-container{top:auto;bottom:calc(60px + env(safe-area-inset-bottom,0));right:8px;left:8px}
+  .toast{max-width:100%;font-size:14px}
+  .flex-between{flex-direction:column;align-items:stretch;gap:8px}
+  .game-cards{display:block}
+  .desktop-table{display:none}
+  .card-title{font-size:15px}
+  .card-sub{font-size:11px}
+  .activity-item{flex-direction:column;gap:2px}
+  .activity-time{min-width:auto;font-size:10px}
+}
+@media(max-width:420px){
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .header-meta{gap:6px}
+  .week-select{min-width:80px;font-size:13px}
+}
+
+/* ═══ PRINT ═══ */
+@media print{
+  .app-header,.app-nav,.btn,.toast-container,.no-print{display:none !important}
+  .main-content{padding:0}
+  .section{display:block !important;page-break-after:always}
+  .card{border:1px solid #ccc;box-shadow:none}
+  body{background:#fff;color:#000;font-size:12px}
+  table{font-size:11px}
+  .badge{border:1px solid currentColor}
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- ═══ HEADER ═══ -->
+<div class="app-header">
+  <div class="flex-center">
+    <div class="header-brand">CIRCA POOL MANAGER</div>
+    <div class="header-disclaimer">Independent pool-management tool. Not affiliated with Circa Sports.</div>
+  </div>
+  <div class="header-meta">
+    <span id="seasonBadge" class="badge badge-pending">2026</span>
+    <select id="globalWeek" class="week-select" onchange="onWeekChange()"></select>
+    <span id="deadlineCountdown" class="countdown countdown-open"></span>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()">&#9776;</button>
+  </div>
+</div>
+
+<!-- ═══ NAV ═══ -->
+<nav class="app-nav" id="appNav">
+  <button class="nav-btn active" data-sec="dashboard" onclick="showSection('dashboard')">&#128202; Dashboard</button>
+  <button class="nav-btn" data-sec="picks" onclick="showSection('picks')">&#127917; Weekly Picks</button>
+  <button class="nav-btn" data-sec="tally" onclick="showSection('tally')">&#9878; Weighted Tally</button>
+  <button class="nav-btn" data-sec="entries" onclick="showSection('entries')">&#127942; Five Entries</button>
+  <button class="nav-btn" data-sec="results" onclick="showSection('results')">&#9989; Results</button>
+  <button class="nav-btn" data-sec="season" onclick="showSection('season')">&#128200; Season Summary</button>
+  <button class="nav-btn" data-sec="frequency" onclick="showSection('frequency')">&#128202; Team Frequency</button>
+  <button class="nav-btn" data-sec="lines" onclick="showSection('lines')">&#128178; Lines &amp; Spreads</button>
+  <button class="nav-btn" data-sec="instructions" onclick="showSection('instructions')">&#128214; Instructions</button>
+  <button class="nav-btn" data-sec="settings" onclick="showSection('settings')">&#9881; Settings</button>
+</nav>
+
+<!-- ═══ TOAST CONTAINER ═══ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══ NOSCRIPT ═══ -->
+<noscript>
+  <div style="background:#ffd700;color:#000;padding:20px;text-align:center;font-family:sans-serif;font-size:16px">
+    <strong>JavaScript Required</strong><br>
+    This tool requires JavaScript to work. If you're viewing this from an email or file preview, tap the <strong>Share</strong> button (box with arrow) and choose <strong>"Open in Safari"</strong> to use the full app.
+  </div>
+</noscript>
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<div class="main-content">
+
+  <!-- DASHBOARD -->
+  <div class="section active" id="sec-dashboard"></div>
+
+  <!-- WEEKLY PICKS -->
+  <div class="section" id="sec-picks"></div>
+
+  <!-- WEIGHTED TALLY -->
+  <div class="section" id="sec-tally"></div>
+
+  <!-- FIVE ENTRIES -->
+  <div class="section" id="sec-entries"></div>
+
+  <!-- RESULTS -->
+  <div class="section" id="sec-results"></div>
+
+  <!-- SEASON SUMMARY -->
+  <div class="section" id="sec-season"></div>
+
+  <!-- TEAM FREQUENCY -->
+  <div class="section" id="sec-frequency"></div>
+
+  <!-- LINES & SPREADS -->
+  <div class="section" id="sec-lines"></div>
+
+  <!-- INSTRUCTIONS -->
+  <div class="section" id="sec-instructions"></div>
+
+  <!-- SETTINGS -->
+  <div class="section" id="sec-settings"></div>
+
+</div>
+
+<!-- ═══ MOBILE BOTTOM NAV ═══ -->
+<div class="mobile-bottom-nav" id="mobileBottomNav">
+  <div class="mob-tabs">
+    <button class="mob-tab active" data-sec="dashboard" onclick="showSection('dashboard')"><span class="mob-ico">&#128202;</span>Home</button>
+    <button class="mob-tab" data-sec="picks" onclick="showSection('picks')"><span class="mob-ico">&#127917;</span>Picks</button>
+    <button class="mob-tab" data-sec="lines" onclick="showSection('lines')"><span class="mob-ico">&#128178;</span>Lines</button>
+    <button class="mob-tab" data-sec="tally" onclick="showSection('tally')"><span class="mob-ico">&#9878;</span>Tally</button>
+    <button class="mob-tab" data-sec="_more" onclick="toggleMobileMore()"><span class="mob-ico">&#8943;</span>More</button>
+  </div>
+</div>
+<div class="mob-more-panel" id="mobileMorePanel">
+  <button class="mob-more-btn" data-sec="entries" onclick="showSection('entries')">&#127942; Entries</button>
+  <button class="mob-more-btn" data-sec="results" onclick="showSection('results')">&#9989; Results</button>
+  <button class="mob-more-btn" data-sec="season" onclick="showSection('season')">&#128200; Season</button>
+  <button class="mob-more-btn" data-sec="frequency" onclick="showSection('frequency')">&#128202; Frequency</button>
+  <button class="mob-more-btn" data-sec="instructions" onclick="showSection('instructions')">&#128214; Help</button>
+  <button class="mob-more-btn" data-sec="settings" onclick="showSection('settings')">&#9881; Settings</button>
+</div>
+
+<!-- ═══ CONFIRM MODAL ═══ -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal">
+    <div class="modal-title" id="confirmTitle">Confirm</div>
+    <div id="confirmBody" style="margin-bottom:16px;color:var(--text2)"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeConfirm(false)">Cancel</button>
+      <button class="btn btn-gold" onclick="closeConfirm(true)">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GENERIC MODAL ═══ -->
+<div class="modal-overlay" id="genericModal">
+  <div class="modal modal-lg" id="genericModalInner"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   SECTION 1: CONSTANTS & NFL TEAM DATA
+   ═══════════════════════════════════════════════════════════ */
+const WEIGHTS = [5, 4, 3, 2, 1];
+const TOTAL_WEEKS = 18;
+const DEFAULT_MEMBERS = ['Errol', 'Marlon', 'DeMarlo', 'Alan', "D'"];
+const MEMBER_COLORS = ['#58a6ff', '#f85149', '#2ea043', '#bc8cff', '#ffd700'];
+const RESULT_TYPES = ['pending', 'win', 'loss', 'push'];
+
+const NFL_TEAMS = [
+  {id:'ARI',abbr:'ARI',name:'Cardinals',full:'Arizona Cardinals',conf:'NFC',div:'West'},
+  {id:'ATL',abbr:'ATL',name:'Falcons',full:'Atlanta Falcons',conf:'NFC',div:'South'},
+  {id:'BAL',abbr:'BAL',name:'Ravens',full:'Baltimore Ravens',conf:'AFC',div:'North'},
+  {id:'BUF',abbr:'BUF',name:'Bills',full:'Buffalo Bills',conf:'AFC',div:'East'},
+  {id:'CAR',abbr:'CAR',name:'Panthers',full:'Carolina Panthers',conf:'NFC',div:'South'},
+  {id:'CHI',abbr:'CHI',name:'Bears',full:'Chicago Bears',conf:'NFC',div:'North'},
+  {id:'CIN',abbr:'CIN',name:'Bengals',full:'Cincinnati Bengals',conf:'AFC',div:'North'},
+  {id:'CLE',abbr:'CLE',name:'Browns',full:'Cleveland Browns',conf:'AFC',div:'North'},
+  {id:'DAL',abbr:'DAL',name:'Cowboys',full:'Dallas Cowboys',conf:'NFC',div:'East'},
+  {id:'DEN',abbr:'DEN',name:'Broncos',full:'Denver Broncos',conf:'AFC',div:'West'},
+  {id:'DET',abbr:'DET',name:'Lions',full:'Detroit Lions',conf:'NFC',div:'North'},
+  {id:'GB', abbr:'GB', name:'Packers',full:'Green Bay Packers',conf:'NFC',div:'North'},
+  {id:'HOU',abbr:'HOU',name:'Texans',full:'Houston Texans',conf:'AFC',div:'South'},
+  {id:'IND',abbr:'IND',name:'Colts',full:'Indianapolis Colts',conf:'AFC',div:'South'},
+  {id:'JAX',abbr:'JAX',name:'Jaguars',full:'Jacksonville Jaguars',conf:'AFC',div:'South'},
+  {id:'KC', abbr:'KC', name:'Chiefs',full:'Kansas City Chiefs',conf:'AFC',div:'West'},
+  {id:'LAC',abbr:'LAC',name:'Chargers',full:'Los Angeles Chargers',conf:'AFC',div:'West'},
+  {id:'LAR',abbr:'LAR',name:'Rams',full:'Los Angeles Rams',conf:'NFC',div:'West'},
+  {id:'LV', abbr:'LV', name:'Raiders',full:'Las Vegas Raiders',conf:'AFC',div:'West'},
+  {id:'MIA',abbr:'MIA',name:'Dolphins',full:'Miami Dolphins',conf:'AFC',div:'East'},
+  {id:'MIN',abbr:'MIN',name:'Vikings',full:'Minnesota Vikings',conf:'NFC',div:'North'},
+  {id:'NE', abbr:'NE', name:'Patriots',full:'New England Patriots',conf:'AFC',div:'East'},
+  {id:'NO', abbr:'NO', name:'Saints',full:'New Orleans Saints',conf:'NFC',div:'South'},
+  {id:'NYG',abbr:'NYG',name:'Giants',full:'New York Giants',conf:'NFC',div:'East'},
+  {id:'NYJ',abbr:'NYJ',name:'Jets',full:'New York Jets',conf:'AFC',div:'East'},
+  {id:'PHI',abbr:'PHI',name:'Eagles',full:'Philadelphia Eagles',conf:'NFC',div:'East'},
+  {id:'PIT',abbr:'PIT',name:'Steelers',full:'Pittsburgh Steelers',conf:'AFC',div:'North'},
+  {id:'SF', abbr:'SF', name:'49ers',full:'San Francisco 49ers',conf:'NFC',div:'West'},
+  {id:'SEA',abbr:'SEA',name:'Seahawks',full:'Seattle Seahawks',conf:'NFC',div:'West'},
+  {id:'TB', abbr:'TB', name:'Buccaneers',full:'Tampa Bay Buccaneers',conf:'NFC',div:'South'},
+  {id:'TEN',abbr:'TEN',name:'Titans',full:'Tennessee Titans',conf:'AFC',div:'South'},
+  {id:'WAS',abbr:'WAS',name:'Commanders',full:'Washington Commanders',conf:'NFC',div:'East'}
+];
+
+const TEAM_MAP = {};
+NFL_TEAMS.forEach(t => TEAM_MAP[t.id] = t);
+
+function teamInfo(id) { return TEAM_MAP[id] || {id,abbr:id,name:id,full:id,conf:'',div:''}; }
+function teamLabel(id) { const t = teamInfo(id); return t.abbr + ' ' + t.name; }
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 2: STATE MANAGEMENT
+   ═══════════════════════════════════════════════════════════ */
+const STORAGE_KEY = 'circaPoolManager_v1';
+
+// Storage abstraction — falls back to in-memory if localStorage is blocked (iOS file://)
+let _memStore = {};
+const store = {
+  getItem(k) { try { return localStorage.getItem(k); } catch(e) { return _memStore[k] || null; } },
+  setItem(k,v) { try { localStorage.setItem(k,v); } catch(e) { _memStore[k] = v; } },
+};
+
+function defaultSettings() {
+  return {
+    season: 2026,
+    members: [...DEFAULT_MEMBERS],
+    deadline: { day: 6, time: '10:00', timezone: 'America/Los_Angeles' },
+    scoring: { win: 1, push: 0.5, loss: 0 },
+    tieBreaking: ['score','members','pick1','pick2','alpha'],
+    linesApiUrl: '',
+    linesProviderLabel: '',
+    oddsApiKey: '',
+    diversification: { poolSize: 10, minConsensus: 3, maxExposure: 4 },
+    commissionerOverride: false,
+    theme: 'dark'
+  };
+}
+
+function defaultWeek() {
+  return {
+    picks: {},
+    notes: {},
+    lines: {},
+    contestLines: {},
+    entries: [
+      {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false},
+      {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false},
+      {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false},
+      {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false},
+      {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false}
+    ],
+    frozenLines: {},
+    results: {},
+    finalized: false,
+    overrides: [],
+    lastSaved: null
+  };
+}
+
+function defaultState() {
+  return {
+    schemaVersion: 1,
+    settings: defaultSettings(),
+    currentWeek: 1,
+    weeks: {},
+    activityLog: []
+  };
+}
+
+let S = defaultState();
+
+function ensureWeek(w) {
+  if (!S.weeks[w]) S.weeks[w] = defaultWeek();
+  const wk = S.weeks[w];
+  S.settings.members.forEach(m => {
+    if (!wk.picks[m]) wk.picks[m] = [null,null,null,null,null];
+    if (wk.notes[m] === undefined) wk.notes[m] = '';
+  });
+  if (!wk.entries || wk.entries.length !== 5) {
+    wk.entries = [];
+    for (let i = 0; i < 5; i++) wk.entries.push({picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false});
+  }
+  if (!wk.contestLines) wk.contestLines = {};
+  return wk;
+}
+
+function W() { return ensureWeek(S.currentWeek); }
+
+function saveState() {
+  try {
+    const wk = S.weeks[S.currentWeek];
+    if (wk) wk.lastSaved = new Date().toISOString();
+    store.setItem(STORAGE_KEY, JSON.stringify(S));
+  } catch(e) {
+    toast('Save failed: ' + e.message, 'error');
+  }
+}
+
+function loadState() {
+  try {
+    const raw = store.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data && typeof data === 'object' && data.schemaVersion) {
+      S = data;
+      if (!S.settings) S.settings = defaultSettings();
+      if (!S.activityLog) S.activityLog = [];
+      if (!S.currentWeek) S.currentWeek = 1;
+    }
+  } catch(e) {
+    toast('Data load error — starting fresh. Old data preserved as backup.', 'warn');
+    try {
+      store.setItem(STORAGE_KEY + '_backup', store.getItem(STORAGE_KEY));
+    } catch(e2) {}
+  }
+}
+
+function logActivity(msg) {
+  S.activityLog.unshift({ time: new Date().toISOString(), msg });
+  if (S.activityLog.length > 200) S.activityLog.length = 200;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 3: UTILITIES
+   ═══════════════════════════════════════════════════════════ */
+function esc(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function toast(msg, type) {
+  type = type || 'info';
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+let _confirmResolve = null;
+function showConfirm(title, body) {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmBody').innerHTML = body;
+    document.getElementById('confirmModal').classList.add('open');
+  });
+}
+function closeConfirm(result) {
+  document.getElementById('confirmModal').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+
+function openGenericModal(html) {
+  document.getElementById('genericModalInner').innerHTML = html;
+  document.getElementById('genericModal').classList.add('open');
+}
+function closeGenericModal() {
+  document.getElementById('genericModal').classList.remove('open');
+}
+
+function formatDt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied!', 'success')).catch(() => toast('Copy failed', 'error'));
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], {type: type || 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function getMemberColor(idx) { return MEMBER_COLORS[idx % MEMBER_COLORS.length]; }
+
+function memberDot(name) {
+  const idx = S.settings.members.indexOf(name);
+  const c = getMemberColor(idx >= 0 ? idx : 0);
+  return '<span class="member-dot" style="background:' + c + '">' + esc(name.charAt(0)) + '</span>';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 4: DEADLINE & WEEK MANAGEMENT
+   ═══════════════════════════════════════════════════════════ */
+function getDeadlineDate(weekNum) {
+  const s = S.settings;
+  const seasonStart = new Date(s.season, 8, 1);
+  let firstSunday = new Date(seasonStart);
+  while (firstSunday.getDay() !== 0) firstSunday.setDate(firstSunday.getDate() + 1);
+  const weekStart = new Date(firstSunday);
+  weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
+  const deadlineDay = s.deadline.day;
+  const diff = (deadlineDay - weekStart.getDay() + 7) % 7;
+  const deadlineDate = new Date(weekStart);
+  deadlineDate.setDate(deadlineDate.getDate() + diff - 7);
+  if (deadlineDate >= weekStart) deadlineDate.setDate(deadlineDate.getDate() - 7);
+  const [hh, mm] = (s.deadline.time || '10:00').split(':').map(Number);
+  const dlStr = deadlineDate.toLocaleDateString('en-US', {timeZone: s.deadline.timezone || 'America/Los_Angeles'});
+  const d = new Date(dlStr);
+  d.setHours(hh, mm, 0, 0);
+  return d;
+}
+
+function getWeekStatus(weekNum) {
+  const wk = S.weeks[weekNum];
+  if (wk && wk.finalized) return 'finalized';
+  if (S.settings.commissionerOverride) return 'open';
+  const dl = getDeadlineDate(weekNum);
+  const now = new Date();
+  const diff = dl - now;
+  if (diff <= 0) return 'locked';
+  if (diff < 3600000) return 'due';
+  return 'open';
+}
+
+function updateCountdown() {
+  const el = document.getElementById('deadlineCountdown');
+  const status = getWeekStatus(S.currentWeek);
+  const wk = S.weeks[S.currentWeek];
+
+  if (wk && wk.finalized) {
+    el.className = 'countdown countdown-locked';
+    el.textContent = 'FINALIZED';
+    return;
+  }
+
+  if (S.settings.commissionerOverride && status !== 'finalized') {
+    el.className = 'countdown countdown-due';
+    el.textContent = 'OVERRIDE ACTIVE';
+    return;
+  }
+
+  const dl = getDeadlineDate(S.currentWeek);
+  const now = new Date();
+  const diff = dl - now;
+
+  if (diff <= 0) {
+    el.className = 'countdown countdown-locked';
+    el.textContent = 'LOCKED';
+  } else if (diff < 3600000) {
+    const mins = Math.floor(diff / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    el.className = 'countdown countdown-due';
+    el.textContent = mins + 'm ' + secs + 's left';
+  } else {
+    const hrs = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    el.className = 'countdown countdown-open';
+    el.textContent = hrs + 'h ' + mins + 'm to deadline';
+  }
+}
+
+function isWeekEditable(weekNum) {
+  if (S.settings.commissionerOverride) return true;
+  const wk = S.weeks[weekNum];
+  if (wk && wk.finalized) return false;
+  return getWeekStatus(weekNum) !== 'locked';
+}
+
+function populateWeekSelector() {
+  const sel = document.getElementById('globalWeek');
+  sel.innerHTML = '';
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
+    const o = document.createElement('option');
+    o.value = w; o.textContent = 'Week ' + w;
+    if (w === S.currentWeek) o.selected = true;
+    sel.appendChild(o);
+  }
+  document.getElementById('seasonBadge').textContent = S.settings.season + ' Season';
+}
+
+function onWeekChange() {
+  S.currentWeek = parseInt(document.getElementById('globalWeek').value);
+  saveState();
+  renderCurrentSection();
+  updateCountdown();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 5: NAVIGATION
+   ═══════════════════════════════════════════════════════════ */
+let currentSection = 'dashboard';
+
+function showSection(name) {
+  currentSection = name;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const sec = document.getElementById('sec-' + name);
+  if (sec) sec.classList.add('active');
+  const btn = document.querySelector('.nav-btn[data-sec="' + name + '"]');
+  if (btn) btn.classList.add('active');
+
+  // Sync mobile bottom nav
+  document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mob-more-btn').forEach(b => b.classList.remove('active'));
+  const mobTab = document.querySelector('.mob-tab[data-sec="' + name + '"]');
+  if (mobTab) { mobTab.classList.add('active'); }
+  else {
+    const mobMore = document.querySelector('.mob-more-btn[data-sec="' + name + '"]');
+    if (mobMore) { mobMore.classList.add('active'); document.querySelector('.mob-tab[data-sec="_more"]').classList.add('active'); }
+  }
+  // Close more panel on section switch
+  const morePanel = document.getElementById('mobileMorePanel');
+  if (morePanel) morePanel.classList.remove('open');
+
+  renderCurrentSection();
+  const nav = document.getElementById('appNav');
+  if (nav.classList.contains('open')) nav.classList.remove('open');
+  window.scrollTo(0, 0);
+}
+
+function toggleMobileMore() {
+  const panel = document.getElementById('mobileMorePanel');
+  if (panel) panel.classList.toggle('open');
+}
+
+function renderCurrentSection() {
+  switch (currentSection) {
+    case 'dashboard': renderDashboard(); break;
+    case 'picks': renderPicks(); break;
+    case 'tally': renderTally(); break;
+    case 'entries': renderEntries(); break;
+    case 'results': renderResults(); break;
+    case 'season': renderSeason(); break;
+    case 'frequency': renderFrequency(); break;
+    case 'lines': renderLines(); break;
+    case 'instructions': renderInstructions(); break;
+    case 'settings': renderSettings(); break;
+  }
+}
+
+function toggleMobileNav() {
+  document.getElementById('appNav').classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 6: PICK VALIDATION & SPREAD HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function getSpread(weekNum, teamId) {
+  // Contest lines take priority (they are the actual Circa contest spreads)
+  const cs = getContestSpread(weekNum, teamId);
+  if (cs != null) return cs;
+  // Fall back to market lines
+  const wk = S.weeks[weekNum];
+  if (!wk || !wk.lines) return null;
+  const line = wk.lines[teamId];
+  return line ? line.spread : null;
+}
+
+function spreadStr(val) {
+  if (val == null || val === '') return '—';
+  const n = parseFloat(val);
+  return isNaN(n) ? '—' : (n > 0 ? '+' + n : String(n));
+}
+
+function validateMemberPicks(weekNum, member) {
+  const wk = ensureWeek(weekNum);
+  const picks = wk.picks[member] || [];
+  const errors = [];
+  const seen = {};
+  picks.forEach((p, i) => {
+    if (p && seen[p]) errors.push('Duplicate: ' + teamInfo(p).abbr + ' in slots ' + seen[p] + ' and ' + (i+1));
+    if (p) seen[p] = (seen[p] || '') + (i + 1);
+  });
+  const filled = picks.filter(p => p != null).length;
+  if (filled < 5) errors.push('Only ' + filled + '/5 picks made');
+  return { complete: filled === 5 && errors.length === 0, errors, filled };
+}
+
+function isMemberComplete(weekNum, member) {
+  return validateMemberPicks(weekNum, member).complete;
+}
+
+function allMembersComplete(weekNum) {
+  return S.settings.members.every(m => isMemberComplete(weekNum, m));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 7: WEIGHTED TALLY CALCULATION
+   ═══════════════════════════════════════════════════════════ */
+function calculateTally(weekNum) {
+  const wk = ensureWeek(weekNum);
+  const members = S.settings.members;
+  const tally = {};
+
+  members.forEach(m => {
+    const picks = wk.picks[m] || [];
+    picks.forEach((teamId, slot) => {
+      if (!teamId) return;
+      if (!tally[teamId]) {
+        tally[teamId] = {
+          teamId, score: 0, memberCount: 0,
+          pick1: 0, pick2: 0, pick3: 0, pick4: 0, pick5: 0,
+          supporters: {},
+          entryExposure: 0
+        };
+      }
+      const weight = WEIGHTS[slot];
+      tally[teamId].score += weight;
+      tally[teamId].memberCount++;
+      tally[teamId]['pick' + (slot + 1)]++;
+      tally[teamId].supporters[m] = slot + 1;
+    });
+  });
+
+  // Count entry exposure
+  if (wk.entries) {
+    wk.entries.forEach(entry => {
+      (entry.picks || []).forEach(tid => {
+        if (tid && tally[tid]) tally[tid].entryExposure++;
+      });
+    });
+  }
+
+  let list = Object.values(tally);
+  list = sortTally(list);
+  return list;
+}
+
+function sortTally(list) {
+  const order = S.settings.tieBreaking || ['score','members','pick1','pick2','alpha'];
+  return list.sort((a, b) => {
+    for (const rule of order) {
+      let diff = 0;
+      switch (rule) {
+        case 'score': diff = b.score - a.score; break;
+        case 'members': diff = b.memberCount - a.memberCount; break;
+        case 'pick1': diff = b.pick1 - a.pick1; break;
+        case 'pick2': diff = b.pick2 - a.pick2; break;
+        case 'alpha': diff = teamInfo(a.teamId).full.localeCompare(teamInfo(b.teamId).full); break;
+      }
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  });
+}
+
+function hasTie(list, idx) {
+  if (idx <= 0) return false;
+  return list[idx].score === list[idx - 1].score;
+}
+
+function getTop5(weekNum) {
+  const list = calculateTally(weekNum);
+  return list.slice(0, 5);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 8: CONTEST ENTRY LOGIC
+   ═══════════════════════════════════════════════════════════ */
+function validateEntry(entry) {
+  const picks = entry.picks || [];
+  const filled = picks.filter(p => p != null);
+  const unique = new Set(filled);
+  if (filled.length < 5) return { valid: false, msg: filled.length + '/5 teams selected' };
+  if (unique.size < filled.length) return { valid: false, msg: 'Duplicate teams in entry' };
+  return { valid: true, msg: 'Valid' };
+}
+
+function validateAllEntries(weekNum) {
+  const wk = ensureWeek(weekNum);
+  return wk.entries.every(e => validateEntry(e).valid);
+}
+
+function populateConsensus(weekNum) {
+  const wk = ensureWeek(weekNum);
+  const top5 = getTop5(weekNum).map(t => t.teamId);
+  wk.entries.forEach(entry => {
+    entry.picks = [...top5];
+    while (entry.picks.length < 5) entry.picks.push(null);
+    entry.status = 'draft';
+  });
+  logActivity('All 5 entries populated with consensus picks for Week ' + weekNum);
+  saveState();
+}
+
+function generateDiversified(weekNum) {
+  const wk = ensureWeek(weekNum);
+  const cfg = S.settings.diversification;
+  const tally = calculateTally(weekNum);
+  const poolSize = Math.min(cfg.poolSize || 10, tally.length);
+  const pool = tally.slice(0, poolSize);
+  const top5ids = tally.slice(0, 5).map(t => t.teamId);
+  const minCon = cfg.minConsensus || 3;
+  const maxExp = cfg.maxExposure || 4;
+
+  if (pool.length < 5) {
+    toast('Not enough candidates to generate entries', 'warn');
+    return;
+  }
+
+  // Entry 1 = top 5 consensus
+  wk.entries[0].picks = pool.slice(0, 5).map(t => t.teamId);
+  wk.entries[0].status = 'draft';
+  wk.entries[0].notes = 'Top 5 consensus';
+
+  // Track exposure
+  const exposure = {};
+  pool.forEach(t => exposure[t.teamId] = 0);
+  wk.entries[0].picks.forEach(id => { if (exposure[id] !== undefined) exposure[id]++; });
+
+  // Entries 2-5: diversify
+  for (let e = 1; e < 5; e++) {
+    const entry = [];
+    // Add top consensus picks first (up to minCon)
+    const available = pool.filter(t => (exposure[t.teamId] || 0) < maxExp);
+    const consensusAvail = available.filter(t => top5ids.includes(t.teamId));
+    const nonConsensus = available.filter(t => !top5ids.includes(t.teamId));
+
+    // Take up to minCon from consensus
+    for (const t of consensusAvail) {
+      if (entry.length >= minCon) break;
+      if (!entry.includes(t.teamId)) entry.push(t.teamId);
+    }
+    // Fill remaining from non-consensus (by weight)
+    for (const t of nonConsensus) {
+      if (entry.length >= 5) break;
+      if (!entry.includes(t.teamId)) entry.push(t.teamId);
+    }
+    // If still short, backfill from consensus
+    for (const t of consensusAvail) {
+      if (entry.length >= 5) break;
+      if (!entry.includes(t.teamId)) entry.push(t.teamId);
+    }
+    // Last resort: any remaining pool
+    for (const t of pool) {
+      if (entry.length >= 5) break;
+      if (!entry.includes(t.teamId)) entry.push(t.teamId);
+    }
+
+    wk.entries[e].picks = entry.slice(0, 5);
+    wk.entries[e].status = 'draft';
+    wk.entries[e].notes = 'Diversified suggestion';
+    entry.forEach(id => { if (exposure[id] !== undefined) exposure[id]++; });
+  }
+
+  logActivity('Generated diversified entries for Week ' + weekNum);
+  saveState();
+}
+
+function freezeEntryLines(weekNum) {
+  const wk = ensureWeek(weekNum);
+  wk.frozenLines = {};
+  wk.entries.forEach((entry, i) => {
+    wk.frozenLines[i] = {};
+    (entry.picks || []).forEach(tid => {
+      if (tid) {
+        const sp = getSpread(weekNum, tid);
+        wk.frozenLines[i][tid] = sp;
+      }
+    });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 9: RESULTS & SCORING
+   ═══════════════════════════════════════════════════════════ */
+function getResultPoints(result) {
+  const sc = S.settings.scoring;
+  switch(result) {
+    case 'win': return sc.win;
+    case 'push': return sc.push;
+    case 'loss': return sc.loss;
+    default: return null;
+  }
+}
+
+function getMemberWeeklyResults(weekNum, member) {
+  const wk = ensureWeek(weekNum);
+  const picks = wk.picks[member] || [];
+  let w = 0, l = 0, p = 0, pts = 0, pending = 0;
+  picks.forEach(tid => {
+    if (!tid) return;
+    const r = wk.results[tid];
+    if (!r || r === 'pending') { pending++; return; }
+    if (r === 'win') { w++; pts += S.settings.scoring.win; }
+    else if (r === 'push') { p++; pts += S.settings.scoring.push; }
+    else if (r === 'loss') { l++; pts += S.settings.scoring.loss; }
+  });
+  return { w, l, p, pts, pending, total: w + l + p };
+}
+
+function getEntryWeeklyResults(weekNum, entryIdx) {
+  const wk = ensureWeek(weekNum);
+  const entry = wk.entries[entryIdx];
+  if (!entry) return { w:0, l:0, p:0, pts:0, pending:0, total:0 };
+  let w = 0, l = 0, p = 0, pts = 0, pending = 0;
+  (entry.picks || []).forEach(tid => {
+    if (!tid) return;
+    const r = wk.results[tid];
+    if (!r || r === 'pending') { pending++; return; }
+    if (r === 'win') { w++; pts += S.settings.scoring.win; }
+    else if (r === 'push') { p++; pts += S.settings.scoring.push; }
+    else if (r === 'loss') { l++; pts += S.settings.scoring.loss; }
+  });
+  return { w, l, p, pts, pending, total: w + l + p };
+}
+
+function getMemberSeasonStats(member) {
+  let w=0,l=0,p=0,pts=0,weeksPlayed=0,totalPicks=0;
+  for (let wk = 1; wk <= TOTAL_WEEKS; wk++) {
+    const r = getMemberWeeklyResults(wk, member);
+    if (r.total > 0) {
+      w += r.w; l += r.l; p += r.p; pts += r.pts;
+      weeksPlayed++;
+    }
+    totalPicks += (S.weeks[wk]?.picks[member] || []).filter(x=>x).length;
+  }
+  return { w, l, p, pts, weeksPlayed, totalPicks, avg: weeksPlayed > 0 ? (pts / weeksPlayed).toFixed(2) : '0' };
+}
+
+function getEntrySeasonStats(entryIdx) {
+  let w=0,l=0,p=0,pts=0,weeksPlayed=0,best=0,worst=999,bestWk=0,worstWk=0;
+  for (let wk = 1; wk <= TOTAL_WEEKS; wk++) {
+    const r = getEntryWeeklyResults(wk, entryIdx);
+    if (r.total > 0) {
+      w += r.w; l += r.l; p += r.p; pts += r.pts;
+      weeksPlayed++;
+      if (r.pts > best) { best = r.pts; bestWk = wk; }
+      if (r.pts < worst) { worst = r.pts; worstWk = wk; }
+    }
+  }
+  if (weeksPlayed === 0) worst = 0;
+  return { w, l, p, pts, weeksPlayed, best, worst, bestWk, worstWk, avg: weeksPlayed > 0 ? (pts / weeksPlayed).toFixed(2) : '0' };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 10: TEAM FREQUENCY CALCULATION
+   ═══════════════════════════════════════════════════════════ */
+function calculateFrequency(opts) {
+  opts = opts || {};
+  const startWk = opts.startWeek || 1;
+  const endWk = opts.endWeek || TOTAL_WEEKS;
+  const filterMember = opts.member || null;
+  const members = S.settings.members;
+  const freq = {};
+
+  NFL_TEAMS.forEach(t => {
+    freq[t.id] = {
+      teamId: t.id, total: 0, byMember: {},
+      weightedPts: 0, ranks: [], entryUse: [0,0,0,0,0],
+      entryTotal: 0, w: 0, l: 0, p: 0, resultPts: 0
+    };
+    members.forEach(m => freq[t.id].byMember[m] = 0);
+  });
+
+  for (let wk = startWk; wk <= endWk; wk++) {
+    const weekData = S.weeks[wk];
+    if (!weekData) continue;
+
+    members.forEach(m => {
+      if (filterMember && m !== filterMember) return;
+      const picks = weekData.picks[m] || [];
+      picks.forEach((tid, slot) => {
+        if (!tid || !freq[tid]) return;
+        freq[tid].total++;
+        freq[tid].byMember[m]++;
+        freq[tid].weightedPts += WEIGHTS[slot];
+        freq[tid].ranks.push(slot + 1);
+      });
+    });
+
+    if (weekData.entries) {
+      weekData.entries.forEach((entry, ei) => {
+        (entry.picks || []).forEach(tid => {
+          if (tid && freq[tid]) {
+            freq[tid].entryUse[ei]++;
+            freq[tid].entryTotal++;
+          }
+        });
+      });
+    }
+
+    // Results
+    if (weekData.results) {
+      Object.entries(weekData.results).forEach(([tid, r]) => {
+        if (!freq[tid]) return;
+        if (r === 'win') { freq[tid].w++; freq[tid].resultPts += S.settings.scoring.win; }
+        else if (r === 'push') { freq[tid].p++; freq[tid].resultPts += S.settings.scoring.push; }
+        else if (r === 'loss') { freq[tid].l++; }
+      });
+    }
+  }
+
+  return Object.values(freq).map(f => {
+    f.avgRank = f.ranks.length > 0 ? (f.ranks.reduce((a,b) => a+b, 0) / f.ranks.length).toFixed(1) : '—';
+    return f;
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 11: LINES MANAGEMENT
+   ═══════════════════════════════════════════════════════════ */
+/* ESPN-to-local team ID mapping */
+const ESPN_TEAM_MAP = {
+  'ARI':'ARI','ATL':'ATL','BAL':'BAL','BUF':'BUF','CAR':'CAR','CHI':'CHI',
+  'CIN':'CIN','CLE':'CLE','DAL':'DAL','DEN':'DEN','DET':'DET','GB':'GB',
+  'HOU':'HOU','IND':'IND','JAX':'JAX','KC':'KC','LAC':'LAC','LAR':'LAR',
+  'LV':'LV','MIA':'MIA','MIN':'MIN','NE':'NE','NO':'NO','NYG':'NYG',
+  'NYJ':'NYJ','PHI':'PHI','PIT':'PIT','SF':'SF','SEA':'SEA','TB':'TB',
+  'TEN':'TEN','WSH':'WAS','WAS':'WAS'
+};
+
+function espnToLocal(abbr) { return ESPN_TEAM_MAP[abbr] || abbr; }
+
+/* The Odds API full team name → local ID mapping */
+const ODDS_API_TEAM_MAP = {
+  'Arizona Cardinals':'ARI','Atlanta Falcons':'ATL','Baltimore Ravens':'BAL',
+  'Buffalo Bills':'BUF','Carolina Panthers':'CAR','Chicago Bears':'CHI',
+  'Cincinnati Bengals':'CIN','Cleveland Browns':'CLE','Dallas Cowboys':'DAL',
+  'Denver Broncos':'DEN','Detroit Lions':'DET','Green Bay Packers':'GB',
+  'Houston Texans':'HOU','Indianapolis Colts':'IND','Jacksonville Jaguars':'JAX',
+  'Kansas City Chiefs':'KC','Los Angeles Chargers':'LAC','Los Angeles Rams':'LAR',
+  'Las Vegas Raiders':'LV','Miami Dolphins':'MIA','Minnesota Vikings':'MIN',
+  'New England Patriots':'NE','New Orleans Saints':'NO','New York Giants':'NYG',
+  'New York Jets':'NYJ','Philadelphia Eagles':'PHI','Pittsburgh Steelers':'PIT',
+  'San Francisco 49ers':'SF','Seattle Seahawks':'SEA','Tampa Bay Buccaneers':'TB',
+  'Tennessee Titans':'TEN','Washington Commanders':'WAS'
+};
+
+function oddsApiToLocal(name) { return ODDS_API_TEAM_MAP[name] || name; }
+
+/* ── The Odds API fetch (primary — supports CORS, free tier) ── */
+async function fetchOddsAPILines(weekNum) {
+  const key = S.settings.oddsApiKey;
+  if (!key) {
+    toast('No Odds API key configured. Go to Settings → Lines Provider to add one.', 'warn');
+    return 0;
+  }
+  toast('Fetching live NFL spreads...', 'info');
+  try {
+    const url = 'https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds/?apiKey=' +
+      encodeURIComponent(key) + '&regions=us&markets=spreads&oddsFormat=american&bookmakers=draftkings,fanduel';
+    const res = await fetch(url);
+    if (res.status === 401) { toast('Invalid API key. Check your key in Settings.', 'error'); return 0; }
+    if (res.status === 429) { toast('API rate limit reached. Try again later or upgrade plan.', 'error'); return 0; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const remaining = res.headers.get('x-requests-remaining');
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Unexpected response format');
+
+    const wk = ensureWeek(weekNum);
+    let count = 0;
+
+    data.forEach(game => {
+      const homeTeamName = game.home_team;
+      const awayTeamName = game.away_team;
+      const homeId = oddsApiToLocal(homeTeamName);
+      const awayId = oddsApiToLocal(awayTeamName);
+      if (!TEAM_MAP[homeId] || !TEAM_MAP[awayId]) return;
+
+      const gameTime = game.commence_time ? new Date(game.commence_time).toLocaleString('en-US', {
+        weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'
+      }) : '';
+
+      // Find spread from bookmakers
+      let homeSpread = null;
+      for (const bk of (game.bookmakers || [])) {
+        const spreadMkt = (bk.markets || []).find(m => m.key === 'spreads');
+        if (spreadMkt) {
+          const homeOutcome = (spreadMkt.outcomes || []).find(o => o.name === homeTeamName);
+          if (homeOutcome && homeOutcome.point != null) {
+            homeSpread = homeOutcome.point;
+            break;
+          }
+        }
+      }
+
+      // Store for home team
+      wk.lines[homeId] = {
+        spread: homeSpread,
+        opponent: awayId,
+        homeAway: 'home',
+        gameDate: gameTime,
+        source: 'DraftKings/FanDuel (Market)',
+        sourceTimestamp: new Date().toISOString(),
+        manual: false,
+        lastUpdate: new Date().toISOString(),
+        lineType: 'market',
+        notes: ''
+      };
+
+      // Store for away team (inverse)
+      wk.lines[awayId] = {
+        spread: homeSpread != null ? -homeSpread : null,
+        opponent: homeId,
+        homeAway: 'away',
+        gameDate: gameTime,
+        source: 'DraftKings/FanDuel (Market)',
+        sourceTimestamp: new Date().toISOString(),
+        manual: false,
+        lastUpdate: new Date().toISOString(),
+        lineType: 'market',
+        notes: ''
+      };
+      count++;
+    });
+
+    saveState();
+    const msg = count + ' games loaded' + (remaining ? ' (' + remaining + ' API calls remaining this month)' : '');
+    toast(msg, 'success');
+    logActivity('Live market lines fetched: ' + count + ' games' + (remaining ? ' | ' + remaining + ' calls left' : ''));
+    return count;
+  } catch(err) {
+    toast('Odds API failed: ' + err.message, 'error');
+    return 0;
+  }
+}
+
+async function fetchESPNLinesForWeek(weekNum) {
+  toast('Fetching Week ' + weekNum + ' lines from ESPN/DraftKings...', 'info');
+  try {
+    const base = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl';
+    const eventsUrl = base + '/seasons/' + S.settings.season + '/types/2/weeks/' + weekNum + '/events?lang=en&region=us';
+    const eventsRes = await fetch(eventsUrl);
+    if (!eventsRes.ok) throw new Error('Events list HTTP ' + eventsRes.status);
+    const eventsData = await eventsRes.json();
+    const eventRefs = (eventsData.items || []).map(i => (i['$ref'] || '').replace('http://', 'https://')).filter(Boolean);
+
+    if (eventRefs.length === 0) throw new Error('No games found for Week ' + weekNum);
+    toast('Found ' + eventRefs.length + ' games, fetching spreads...', 'info');
+
+    const wk = ensureWeek(weekNum);
+    let count = 0, spreadCount = 0;
+
+    for (let i = 0; i < eventRefs.length; i += 4) {
+      const batch = eventRefs.slice(i, i + 4);
+      const results = await Promise.allSettled(batch.map(async ref => {
+        const eventRes = await fetch(ref);
+        if (!eventRes.ok) return null;
+        const ev = await eventRes.json();
+
+        // Parse team abbreviations from shortName (e.g. "NE @ SEA")
+        const shortName = ev.shortName || '';
+        const parts = shortName.split(' @ ');
+        if (parts.length !== 2) return null;
+        const awayAbbr = espnToLocal(parts[0].trim());
+        const homeAbbr = espnToLocal(parts[1].trim());
+        if (!awayAbbr || !homeAbbr) return null;
+
+        // Verify teams exist in our mapping
+        if (!TEAM_MAP[homeAbbr] && !TEAM_MAP[awayAbbr]) return null;
+
+        const gameDate = ev.date || '';
+        const comps = ev.competitions || [];
+        const comp = comps[0];
+        if (!comp) return null;
+
+        // Fetch odds from the $ref
+        let homeSpread = null, details = '';
+        const oddsObj = comp.odds;
+        const oddsUrl = oddsObj && oddsObj['$ref'] ? oddsObj['$ref'].replace('http://', 'https://') : null;
+        if (oddsUrl) {
+          try {
+            const oddsRes = await fetch(oddsUrl);
+            if (oddsRes.ok) {
+              const oddsData = await oddsRes.json();
+              const items = oddsData.items || [oddsData];
+              const first = items[0] || oddsData;
+              if (first.spread != null) homeSpread = parseFloat(first.spread);
+              if (first.details) details = first.details;
+            }
+          } catch(e) {}
+        }
+
+        return { homeTeam: homeAbbr, awayTeam: awayAbbr, homeSpread, gameDate, details };
+      }));
+
+      for (const r of results) {
+        if (r.status !== 'fulfilled' || !r.value) continue;
+        const { homeTeam, awayTeam, homeSpread, gameDate, details } = r.value;
+        const dt = gameDate ? new Date(gameDate).toLocaleString('en-US', {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : '';
+
+        wk.lines[homeTeam] = {
+          spread: homeSpread,
+          opponent: awayTeam,
+          homeAway: 'home',
+          gameDate: dt,
+          source: 'ESPN/DraftKings',
+          sourceTimestamp: new Date().toISOString(),
+          manual: false,
+          lastUpdate: new Date().toISOString(),
+          lineType: 'market',
+          details: details,
+          notes: ''
+        };
+
+        wk.lines[awayTeam] = {
+          spread: homeSpread != null ? -homeSpread : null,
+          opponent: homeTeam,
+          homeAway: 'away',
+          gameDate: dt,
+          source: 'ESPN/DraftKings',
+          sourceTimestamp: new Date().toISOString(),
+          manual: false,
+          lastUpdate: new Date().toISOString(),
+          lineType: 'market',
+          notes: ''
+        };
+        count++;
+        if (homeSpread != null) spreadCount++;
+      }
+    }
+
+    saveState();
+    toast(count + ' games loaded, ' + spreadCount + ' with spreads (Week ' + weekNum + ')', 'success');
+    logActivity('ESPN market lines fetched for Week ' + weekNum + ': ' + count + ' games, ' + spreadCount + ' with spreads');
+    return count;
+  } catch(err) {
+    toast('ESPN fetch failed: ' + err.message, 'error');
+    console.error('ESPN fetch error:', err);
+    return 0;
+  }
+}
+
+/* Contest lines — these are entered manually from Circa and never change once saved */
+function setContestLine(weekNum, teamId, spread) {
+  const wk = ensureWeek(weekNum);
+  if (!wk.contestLines) wk.contestLines = {};
+  wk.contestLines[teamId] = {
+    spread: parseFloat(spread),
+    lockedAt: new Date().toISOString(),
+    source: 'Circa Contest'
+  };
+  saveState();
+}
+
+function getContestSpread(weekNum, teamId) {
+  const wk = S.weeks[weekNum];
+  if (!wk || !wk.contestLines) return null;
+  const cl = wk.contestLines[teamId];
+  return cl ? cl.spread : null;
+}
+
+function getMarketSpread(weekNum, teamId) {
+  const wk = S.weeks[weekNum];
+  if (!wk || !wk.lines || !wk.lines[teamId]) return null;
+  return wk.lines[teamId].spread;
+}
+
+/* Custom provider fetch (original) */
+function fetchLinesForWeek(weekNum) {
+  const url = S.settings.linesApiUrl;
+  if (!url) return fetchESPNLinesForWeek(weekNum);
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 10000);
+  return fetch(url.replace('{week}', weekNum), { signal: controller.signal })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(data => {
+      if (!data || !Array.isArray(data)) throw new Error('Invalid response');
+      const wk = ensureWeek(weekNum);
+      data.forEach(item => {
+        if (item.team && TEAM_MAP[item.team]) {
+          wk.lines[item.team] = {
+            spread: parseFloat(item.spread) || null, opponent: item.opponent || '',
+            homeAway: item.homeAway || '', gameDate: item.gameDate || '',
+            source: S.settings.linesProviderLabel || url,
+            sourceTimestamp: new Date().toISOString(), manual: false,
+            lastUpdate: new Date().toISOString(), lineType: 'market', notes: ''
+          };
+        }
+      });
+      saveState();
+      toast('Lines imported for Week ' + weekNum, 'success');
+      logActivity('Fetched lines from provider for Week ' + weekNum);
+    })
+    .catch(err => { toast('Provider fetch failed: ' + err.message + '. Trying ESPN...', 'warn'); return fetchESPNLinesForWeek(weekNum); });
+}
+
+function importLinesFromCSV(weekNum, csv) {
+  const wk = ensureWeek(weekNum);
+  const lines = csv.trim().split('\n');
+  let count = 0;
+  lines.forEach((line, i) => {
+    if (i === 0 && line.toLowerCase().includes('team')) return;
+    const parts = line.split(',').map(s => s.trim());
+    if (parts.length < 2) return;
+    const teamId = parts[0].toUpperCase();
+    if (!TEAM_MAP[teamId]) return;
+    wk.lines[teamId] = {
+      spread: parseFloat(parts[1]) || null,
+      opponent: parts[2] || '',
+      homeAway: parts[3] || '',
+      gameDate: parts[4] || '',
+      source: 'CSV Import',
+      sourceTimestamp: new Date().toISOString(),
+      manual: false,
+      lastUpdate: new Date().toISOString(),
+      notes: parts[5] || ''
+    };
+    count++;
+  });
+  saveState();
+  toast('Imported ' + count + ' lines from CSV', 'success');
+  logActivity('CSV lines import for Week ' + weekNum + ': ' + count + ' teams');
+}
+
+function importLinesFromJSON(weekNum, json) {
+  const wk = ensureWeek(weekNum);
+  let data;
+  try { data = JSON.parse(json); } catch(e) { toast('Invalid JSON', 'error'); return; }
+  if (!Array.isArray(data) && typeof data === 'object') data = Object.entries(data).map(([k,v]) => ({team:k,...(typeof v==='object'?v:{spread:v})}));
+  if (!Array.isArray(data)) { toast('Unexpected JSON format', 'error'); return; }
+  let count = 0;
+  data.forEach(item => {
+    const teamId = (item.team || item.id || '').toUpperCase();
+    if (!TEAM_MAP[teamId]) return;
+    wk.lines[teamId] = {
+      spread: parseFloat(item.spread) ?? null,
+      opponent: item.opponent || '',
+      homeAway: item.homeAway || item.home_away || '',
+      gameDate: item.gameDate || item.game_date || '',
+      source: 'JSON Import',
+      sourceTimestamp: new Date().toISOString(),
+      manual: false,
+      lastUpdate: new Date().toISOString(),
+      notes: item.notes || ''
+    };
+    count++;
+  });
+  saveState();
+  toast('Imported ' + count + ' lines from JSON', 'success');
+  logActivity('JSON lines import for Week ' + weekNum + ': ' + count + ' teams');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 12: IMPORT / EXPORT
+   ═══════════════════════════════════════════════════════════ */
+function exportAllJSON() {
+  const json = JSON.stringify(S, null, 2);
+  downloadFile(json, 'circa-pool-' + S.settings.season + '-backup-' + new Date().toISOString().slice(0,10) + '.json', 'application/json');
+  toast('Data exported', 'success');
+  logActivity('Full data export');
+}
+
+function importAllJSON(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || !data.schemaVersion) { toast('Invalid backup file', 'error'); return; }
+      showConfirm('Import Data', 'This will replace ALL current data. Continue?').then(ok => {
+        if (!ok) return;
+        S = data;
+        saveState();
+        toast('Data imported successfully', 'success');
+        logActivity('Full data import from file');
+        populateWeekSelector();
+        renderCurrentSection();
+        updateCountdown();
+      });
+    } catch(err) {
+      toast('Invalid JSON file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function exportCSV(rows, filename) {
+  const csv = rows.map(r => r.map(c => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(',')).join('\n');
+  downloadFile(csv, filename, 'text/csv');
+}
+
+function resetAllData() {
+  showConfirm('Reset Application', 'This will permanently delete ALL data including picks, entries, results, and settings. This cannot be undone.').then(ok => {
+    if (!ok) return;
+    S = defaultState();
+    saveState();
+    toast('Application reset', 'info');
+    populateWeekSelector();
+    renderCurrentSection();
+    updateCountdown();
+  });
+}
+
+function loadDemoData() {
+  showConfirm('Load Demo Data', 'This will add sample data for Week 1. Any existing Week 1 data will be overwritten.').then(ok => {
+    if (!ok) return;
+    const wk = ensureWeek(1);
+    const members = S.settings.members;
+    const demoTeams = ['KC','BAL','DET','PHI','SF','BUF','DAL','MIN','CIN','MIA'];
+    members.forEach((m, mi) => {
+      wk.picks[m] = [];
+      for (let s = 0; s < 5; s++) {
+        wk.picks[m][s] = demoTeams[(mi * 2 + s) % demoTeams.length];
+      }
+    });
+    // Add some lines
+    demoTeams.forEach((t, i) => {
+      wk.lines[t] = {
+        spread: [-3, -1.5, -7, -4.5, -2.5, -6, 3, -1, -3.5, 2.5][i],
+        opponent: demoTeams[(i + 5) % demoTeams.length],
+        homeAway: i % 2 === 0 ? 'home' : 'away',
+        gameDate: 'Sun Sep 7',
+        source: 'Demo',
+        sourceTimestamp: new Date().toISOString(),
+        manual: true,
+        lastUpdate: new Date().toISOString(),
+        notes: ''
+      };
+    });
+    saveState();
+    toast('Demo data loaded for Week 1', 'success');
+    logActivity('Demo data loaded');
+    renderCurrentSection();
+  });
+}
+
+/* placeholder — render functions added in next parts */
+function renderDashboard() { document.getElementById('sec-dashboard').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderDashboardFull(); }
+function renderPicks() { document.getElementById('sec-picks').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderPicksFull(); }
+function renderTally() { document.getElementById('sec-tally').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderTallyFull(); }
+function renderEntries() { document.getElementById('sec-entries').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderEntriesFull(); }
+function renderResults() { document.getElementById('sec-results').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderResultsFull(); }
+function renderSeason() { document.getElementById('sec-season').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderSeasonFull(); }
+function renderFrequency() { document.getElementById('sec-frequency').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderFrequencyFull(); }
+function renderLines() {
+  document.getElementById('sec-lines').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>';
+  renderLinesFull();
+  // Auto-fetch if no lines loaded for this week
+  const wk = ensureWeek(S.currentWeek);
+  if (Object.keys(wk.lines || {}).length === 0) {
+    fetchESPNLinesUI();
+  }
+}
+function renderInstructions() { renderInstructionsFull(); }
+function renderSettings() { renderSettingsFull(); }
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 13: RENDER — DASHBOARD
+   ═══════════════════════════════════════════════════════════ */
+function renderDashboardFull() {
+  const wk = ensureWeek(S.currentWeek);
+  const members = S.settings.members;
+  const status = getWeekStatus(S.currentWeek);
+  const tally = calculateTally(S.currentWeek);
+  const top5 = tally.slice(0, 5);
+  const complete = members.filter(m => isMemberComplete(S.currentWeek, m));
+  const incomplete = members.filter(m => !isMemberComplete(S.currentWeek, m));
+  const uniqueTeams = new Set();
+  members.forEach(m => (wk.picks[m]||[]).forEach(t => { if(t) uniqueTeams.add(t); }));
+
+  // Entry stats
+  const entryStatuses = wk.entries.map((e,i) => ({ idx: i, valid: validateEntry(e).valid, status: e.status }));
+  const linesCount = Object.keys(wk.lines).length;
+  const hasResults = Object.values(wk.results).some(r => r && r !== 'pending');
+
+  // Season entry stats
+  let entrySeasonHtml = '';
+  for (let i = 0; i < 5; i++) {
+    const es = getEntrySeasonStats(i);
+    entrySeasonHtml += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px"><span>Entry ' + (i+1) + '</span><span class="fw-700">' + es.w + '-' + es.l + '-' + es.p + ' (' + es.pts + ' pts)</span></div>';
+  }
+
+  // Activity log recent
+  const recentActivity = (S.activityLog || []).slice(0, 8).map(a =>
+    '<div class="activity-item"><span class="activity-time">' + formatDt(a.time) + '</span><span>' + esc(a.msg) + '</span></div>'
+  ).join('') || '<div class="text-dim fs-sm">No recent activity</div>';
+
+  const el = document.getElementById('sec-dashboard');
+  el.innerHTML = `
+    ${S.settings.commissionerOverride ? '<div class="override-banner">&#9888; Commissioner Override is ACTIVE — deadline locks are bypassed</div>' : ''}
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="stat-val">${S.settings.season}</div><div class="stat-lbl">Season</div></div>
+      <div class="stat-tile"><div class="stat-val">${S.currentWeek}</div><div class="stat-lbl">Current Week</div></div>
+      <div class="stat-tile"><div class="stat-val">${complete.length}/5</div><div class="stat-lbl">Picks Complete</div></div>
+      <div class="stat-tile"><div class="stat-val">${uniqueTeams.size}</div><div class="stat-lbl">Unique Teams</div></div>
+      <div class="stat-tile"><div class="stat-val">${linesCount}</div><div class="stat-lbl">Lines Loaded</div></div>
+      <div class="stat-tile">
+        <div class="stat-val"><span class="badge badge-${status}">${status.toUpperCase()}</span></div>
+        <div class="stat-lbl">Week Status</div>
+      </div>
+    </div>
+
+    ${incomplete.length > 0 ? '<div class="alert alert-warn">&#9888; Incomplete picks: <strong>' + incomplete.map(m => esc(m)).join(', ') + '</strong></div>' : ''}
+    ${linesCount === 0 ? '<div class="alert alert-info">&#9432; No lines loaded for Week ' + S.currentWeek + '. Go to Lines & Spreads to add them.</div>' : ''}
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:16px;">
+      <div class="card">
+        <div class="card-title">Top 5 Consensus</div>
+        <div class="card-sub">Week ${S.currentWeek} weighted tally leaders</div>
+        ${top5.length > 0 ? '<table><thead><tr><th>#</th><th>Team</th><th>Score</th><th>Members</th></tr></thead><tbody>' +
+          top5.map((t, i) => '<tr class="top5-highlight"><td class="fw-700 text-gold">' + (i+1) + '</td><td class="fw-700">' + esc(teamLabel(t.teamId)) + '</td><td>' + t.score + '</td><td>' + t.memberCount + '/5</td></tr>').join('') +
+          '</tbody></table>' : '<div class="empty-state"><div class="empty-icon">&#127917;</div><p>Enter picks to see consensus</p></div>'}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Contest Entries</div>
+        <div class="card-sub">Status of all 5 entries</div>
+        ${wk.entries.map((e, i) => {
+          const v = validateEntry(e);
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span class="fw-700 fs-sm">Entry ' + (i+1) + '</span><span class="badge badge-' + (e.status === 'finalized' ? 'finalized' : e.status === 'locked' ? 'locked' : e.status === 'approved' ? 'approved' : v.valid ? 'open' : 'pending') + '">' + (e.status === 'draft' ? (v.valid ? 'Ready' : v.msg) : e.status.toUpperCase()) + '</span></div>';
+        }).join('')}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Season Entry Totals</div>
+        <div class="card-sub">W-L-P across all weeks</div>
+        ${entrySeasonHtml}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recent Activity</div>
+        <div class="card-sub">Latest actions</div>
+        ${recentActivity}
+      </div>
+    </div>
+
+    <div class="card no-print">
+      <div class="card-title">Quick Actions</div>
+      <div class="btn-group mt-8">
+        <button class="btn btn-gold" onclick="showSection('picks')">&#127917; Enter Picks</button>
+        <button class="btn btn-outline" onclick="showSection('tally')">&#9878; View Tally</button>
+        <button class="btn btn-outline" onclick="showSection('entries')">&#127942; Build Entries</button>
+        <button class="btn btn-outline" onclick="showSection('results')">&#9989; Enter Results</button>
+        <button class="btn btn-outline" onclick="showSection('lines')">&#128178; Import Lines</button>
+        <button class="btn btn-outline" onclick="finalizeWeek()">&#128274; Finalize Week</button>
+      </div>
+    </div>
+  `;
+}
+
+async function finalizeWeek() {
+  const wk = ensureWeek(S.currentWeek);
+  if (!allMembersComplete(S.currentWeek)) {
+    toast('Cannot finalize: not all members have 5 picks', 'warn');
+    return;
+  }
+  if (!validateAllEntries(S.currentWeek)) {
+    if (S.settings.commissionerOverride) {
+      const ok = await showConfirm('Commissioner Override', 'Not all entries are valid. Finalize anyway with commissioner override?');
+      if (!ok) return;
+      logActivity('Commissioner override: finalized Week ' + S.currentWeek + ' with incomplete entries');
+    } else {
+      toast('Cannot finalize: not all entries are valid (5 unique teams each)', 'warn');
+      return;
+    }
+  }
+  const ok = await showConfirm('Finalize Week ' + S.currentWeek, 'Lock all picks and entries for Week ' + S.currentWeek + '? Lines will be frozen. This can only be undone with commissioner override.');
+  if (!ok) return;
+  wk.finalized = true;
+  freezeEntryLines(S.currentWeek);
+  wk.entries.forEach(e => e.status = 'finalized');
+  logActivity('Week ' + S.currentWeek + ' finalized');
+  saveState();
+  toast('Week ' + S.currentWeek + ' finalized', 'success');
+  renderCurrentSection();
+  updateCountdown();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 14: RENDER — INSTRUCTIONS
+   ═══════════════════════════════════════════════════════════ */
+function renderInstructionsFull() {
+  document.getElementById('sec-instructions').innerHTML = `
+    <div class="card">
+      <div class="card-title">&#128214; How to Use Circa Pool Manager</div>
+      <div class="card-sub">Weekly workflow for your 5-person syndicate</div>
+      <ol style="padding-left:20px;line-height:2;color:var(--text);font-size:14px">
+        <li><strong>Select the NFL week</strong> using the dropdown in the header.</li>
+        <li><strong>Load or enter the current Circa lines</strong> in the <em>Lines & Spreads</em> section. You can enter manually, paste CSV/JSON, or use a configured API.</li>
+        <li><strong>Enter five ranked selections for each member</strong> in the <em>Weekly Picks</em> section. Use the member tabs to switch between members. Pick 1 is most confident, Pick 5 is least.</li>
+        <li><strong>Confirm each member has five unique picks.</strong> The completion indicator will show green when all 5 are entered.</li>
+        <li><strong>Review the weighted tally</strong> in the <em>Weighted Tally</em> section to see which teams have the most group support.</li>
+        <li><strong>Review the Top 5 consensus</strong> — these are the most-supported plays based on combined preference weights.</li>
+        <li><strong>Build or generate the five contest entries</strong> in the <em>Five Entries</em> section. Choose Manual, Consensus Copy, or Diversified Suggestion mode.</li>
+        <li><strong>Approve and lock the entries.</strong> Once satisfied, lock each entry.</li>
+        <li><strong>Enter results</strong> after games are complete in the <em>Results</em> section.</li>
+        <li><strong>Review Season Summary and Team Frequency</strong> reports to track performance.</li>
+        <li><strong>Export or back up the data</strong> regularly in <em>Settings</em>.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <div class="card-title">&#9878; Preference Weighting System</div>
+      <div class="card-sub">How consensus scores are calculated</div>
+      <table>
+        <thead><tr><th>Position</th><th>Weight</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="fw-700">Pick 1</td><td class="text-gold fw-700">5 points</td><td>Strongest conviction play</td></tr>
+          <tr><td class="fw-700">Pick 2</td><td class="text-gold fw-700">4 points</td><td>High confidence</td></tr>
+          <tr><td class="fw-700">Pick 3</td><td class="text-gold fw-700">3 points</td><td>Solid play</td></tr>
+          <tr><td class="fw-700">Pick 4</td><td class="text-gold fw-700">2 points</td><td>Moderate confidence</td></tr>
+          <tr><td class="fw-700">Pick 5</td><td class="text-gold fw-700">1 point</td><td>Value selection</td></tr>
+        </tbody>
+      </table>
+      <div class="alert alert-info mt-16">
+        <span>&#9432;</span>
+        <div>These <strong>preference weights</strong> measure how strongly the group supports a pick. They are <strong>separate from contest-result scoring</strong> (Win = ${S.settings.scoring.win} pt, Push = ${S.settings.scoring.push} pt, Loss = ${S.settings.scoring.loss} pt).</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">&#128337; Suggested Deadline Message</div>
+      <div class="card-sub">Copy and share with the group</div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin:12px 0;font-style:italic;color:var(--text2)">
+        "Hey team, I'd like to suggest that all weekly picks be submitted by Saturday at 10:00 a.m. Pacific Time."
+      </div>
+      <button class="btn btn-outline btn-sm copy-btn" onclick="copyText('Hey team, I\\'d like to suggest that all weekly picks be submitted by Saturday at 10:00 a.m. Pacific Time.')">Copy Message</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">&#128274; Tie-Breaking Rules</div>
+      <div class="card-sub">When two teams have the same weighted score</div>
+      <ol style="padding-left:20px;line-height:2;font-size:13px">
+        <li>Highest total weighted score</li>
+        <li>Highest number of supporting members</li>
+        <li>Highest number of Pick 1 rankings</li>
+        <li>Highest number of Pick 2 rankings</li>
+        <li>Alphabetical team name</li>
+      </ol>
+      <div class="fs-xs text-dim mt-8">Tie-breaking order can be customized in Settings.</div>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 15: RENDER — SETTINGS
+   ═══════════════════════════════════════════════════════════ */
+function renderSettingsFull() {
+  const s = S.settings;
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const tbLabels = {score:'Weighted Score',members:'Member Count',pick1:'Pick 1 Count',pick2:'Pick 2 Count',alpha:'Alphabetical'};
+
+  document.getElementById('sec-settings').innerHTML = `
+    <div class="card">
+      <div class="card-title">&#9881; General Settings</div>
+      <div class="form-row mt-8">
+        <div class="form-group">
+          <label>Season</label>
+          <input type="number" id="setSeason" value="${s.season}" onchange="s_updateSeason(this.value)">
+        </div>
+        <div class="form-group">
+          <label>Theme</label>
+          <select id="setTheme" onchange="s_updateTheme(this.value)">
+            <option value="dark" ${s.theme==='dark'?'selected':''}>Dark</option>
+            <option value="light" ${s.theme==='light'?'selected':''}>Light</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Members</div>
+      <div class="card-sub">Edit the 5 syndicate member names</div>
+      ${s.members.map((m, i) => `
+        <div class="form-row">
+          <div class="form-group">
+            <label>Member ${i+1}</label>
+            <input type="text" value="${esc(m)}" onchange="s_updateMember(${i}, this.value)">
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Deadline</div>
+      <div class="form-row mt-8">
+        <div class="form-group">
+          <label>Day</label>
+          <select onchange="s_updateDeadlineDay(this.value)">
+            ${dayNames.map((d,i) => '<option value="' + i + '" ' + (s.deadline.day===i?'selected':'') + '>' + d + '</option>').join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Time</label>
+          <input type="time" value="${s.deadline.time}" onchange="s_updateDeadlineTime(this.value)">
+        </div>
+        <div class="form-group">
+          <label>Time Zone</label>
+          <select onchange="s_updateDeadlineTZ(this.value)">
+            <option value="America/Los_Angeles" ${s.deadline.timezone==='America/Los_Angeles'?'selected':''}>Pacific (America/Los_Angeles)</option>
+            <option value="America/Denver" ${s.deadline.timezone==='America/Denver'?'selected':''}>Mountain</option>
+            <option value="America/Chicago" ${s.deadline.timezone==='America/Chicago'?'selected':''}>Central</option>
+            <option value="America/New_York" ${s.deadline.timezone==='America/New_York'?'selected':''}>Eastern</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Scoring</div>
+      <div class="form-row mt-8">
+        <div class="form-group"><label>Win Points</label><input type="number" step="0.5" value="${s.scoring.win}" onchange="s_updateScoring('win',this.value)"></div>
+        <div class="form-group"><label>Push Points</label><input type="number" step="0.5" value="${s.scoring.push}" onchange="s_updateScoring('push',this.value)"></div>
+        <div class="form-group"><label>Loss Points</label><input type="number" step="0.5" value="${s.scoring.loss}" onchange="s_updateScoring('loss',this.value)"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Tie-Breaking Order</div>
+      <div class="card-sub">Drag or reorder the priority (top = highest priority)</div>
+      <div id="tieBreakList">
+        ${s.tieBreaking.map((tb, i) => '<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:4px;background:var(--bg)"><span class="fw-700 text-gold">' + (i+1) + '.</span> ' + (tbLabels[tb]||tb) + ' <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="s_moveTB(' + i + ',-1)">&#9650;</button><button class="btn btn-outline btn-sm" onclick="s_moveTB(' + i + ',1)">&#9660;</button></div>').join('')}
+      </div>
+    </div>
+
+    <div class="card" style="border-color:var(--gold2)">
+      <div class="card-title text-gold">&#128268; Live Lines Provider</div>
+      <div class="card-sub">Pull live NFL spreads automatically</div>
+
+      <div class="alert alert-gold mt-8">
+        <span>&#9733;</span>
+        <div>
+          <strong>Quick Setup (free):</strong> Get a free API key from
+          <a href="https://the-odds-api.com" target="_blank" style="color:var(--gold);text-decoration:underline">the-odds-api.com</a>
+          (500 requests/month free). Paste it below and click "Fetch Live Lines" on the Lines & Spreads page.
+          <br><br>
+          <strong>Steps:</strong> 1) Go to the-odds-api.com → 2) Sign up (free) → 3) Copy your API key → 4) Paste below → 5) Save
+        </div>
+      </div>
+
+      <div class="form-row mt-16">
+        <div class="form-group">
+          <label>The Odds API Key (free tier)</label>
+          <input type="text" value="${esc(s.oddsApiKey || '')}" onchange="s_updateOddsKey(this.value)" placeholder="Paste your API key here" style="font-family:monospace">
+        </div>
+      </div>
+
+      ${s.oddsApiKey ? '<div class="alert alert-success mt-8"><span>&#9989;</span> API key configured! Go to <strong>Lines & Spreads</strong> and click "Fetch Live Lines" to pull current spreads.</div>' : '<div class="alert alert-info mt-8"><span>&#9432;</span> No API key set. Live line fetching is disabled.</div>'}
+
+      <hr class="divider">
+      <div class="card-sub">Advanced: Custom Provider (optional)</div>
+      <div class="form-row mt-8">
+        <div class="form-group"><label>Custom API URL (use {week} placeholder)</label><input type="text" value="${esc(s.linesApiUrl)}" onchange="s_updateLinesUrl(this.value)" placeholder="https://api.example.com/lines?week={week}"></div>
+        <div class="form-group"><label>Provider Label</label><input type="text" value="${esc(s.linesProviderLabel)}" onchange="s_updateLinesLabel(this.value)" placeholder="e.g. Custom Feed"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Entry Diversification</div>
+      <div class="form-row mt-8">
+        <div class="form-group"><label>Candidate Pool Size</label><input type="number" value="${s.diversification.poolSize}" onchange="s_updateDiv('poolSize',this.value)"></div>
+        <div class="form-group"><label>Min Top 5 per Entry</label><input type="number" value="${s.diversification.minConsensus}" onchange="s_updateDiv('minConsensus',this.value)"></div>
+        <div class="form-group"><label>Max Team Exposure (of 5 entries)</label><input type="number" value="${s.diversification.maxExposure}" onchange="s_updateDiv('maxExposure',this.value)"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Commissioner Override</div>
+      <div class="card-sub">Bypass deadline locks to edit past-due weeks</div>
+      <div class="flex-center mt-8">
+        <label style="display:inline;margin:0">
+          <input type="checkbox" ${s.commissionerOverride ? 'checked' : ''} onchange="s_toggleOverride(this.checked)">
+          Enable Commissioner Override
+        </label>
+      </div>
+      ${s.commissionerOverride ? '<div class="alert alert-warn mt-8">&#9888; Override is active. All deadline locks are bypassed. Edits to locked weeks are logged.</div>' : ''}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Data Management</div>
+      <div class="btn-group mt-8">
+        <button class="btn btn-outline" onclick="exportAllJSON()">&#128229; Export JSON Backup</button>
+        <button class="btn btn-outline" onclick="document.getElementById('importFileInput').click()">&#128228; Import JSON Backup</button>
+        <button class="btn btn-outline" onclick="loadDemoData()">&#128202; Load Demo Data</button>
+        <button class="btn btn-red" onclick="resetAllData()">&#128465; Reset Application</button>
+        <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importAllJSON(this.files[0])">
+      </div>
+    </div>
+  `;
+}
+
+// Settings handlers
+function s_updateSeason(v) { S.settings.season = parseInt(v) || 2026; saveState(); document.getElementById('seasonBadge').textContent = S.settings.season + ' Season'; }
+function s_updateTheme(v) { S.settings.theme = v; document.body.setAttribute('data-theme', v); saveState(); }
+function s_updateMember(i, v) {
+  const old = S.settings.members[i];
+  S.settings.members[i] = v.trim() || old;
+  // Migrate picks
+  for (const wkNum in S.weeks) {
+    const wk = S.weeks[wkNum];
+    if (wk.picks[old]) { wk.picks[v.trim()] = wk.picks[old]; delete wk.picks[old]; }
+    if (wk.notes[old] !== undefined) { wk.notes[v.trim()] = wk.notes[old]; delete wk.notes[old]; }
+  }
+  saveState(); logActivity('Renamed member ' + old + ' to ' + v.trim());
+}
+function s_updateDeadlineDay(v) { S.settings.deadline.day = parseInt(v); saveState(); updateCountdown(); }
+function s_updateDeadlineTime(v) { S.settings.deadline.time = v; saveState(); updateCountdown(); }
+function s_updateDeadlineTZ(v) { S.settings.deadline.timezone = v; saveState(); updateCountdown(); }
+function s_updateScoring(k, v) { S.settings.scoring[k] = parseFloat(v) || 0; saveState(); }
+function s_moveTB(idx, dir) {
+  const arr = S.settings.tieBreaking;
+  const ni = idx + dir;
+  if (ni < 0 || ni >= arr.length) return;
+  [arr[idx], arr[ni]] = [arr[ni], arr[idx]];
+  saveState(); renderSettings();
+}
+function s_updateOddsKey(v) { S.settings.oddsApiKey = v.trim(); saveState(); toast(v.trim() ? 'API key saved' : 'API key cleared', 'success'); renderSettings(); }
+function s_updateLinesUrl(v) { S.settings.linesApiUrl = v; saveState(); }
+function s_updateLinesLabel(v) { S.settings.linesProviderLabel = v; saveState(); }
+function s_updateDiv(k, v) { S.settings.diversification[k] = parseInt(v) || 0; saveState(); }
+function s_toggleOverride(v) {
+  S.settings.commissionerOverride = v;
+  if (v) logActivity('Commissioner override enabled');
+  else logActivity('Commissioner override disabled');
+  saveState(); updateCountdown(); renderSettings();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 16: RENDER — WEEKLY PICKS (member tabs)
+   ═══════════════════════════════════════════════════════════ */
+let picksActiveMember = null;
+
+function teamSelectHTML(memberIdx, slot, current, exclude, weekNum) {
+  const selId = 'pick-' + memberIdx + '-' + slot;
+  let html = '<select id="' + selId + '" onchange="onPickChange(' + memberIdx + ',' + slot + ',this.value)" style="min-width:150px;width:100%">';
+  html += '<option value="">— Select Team —</option>';
+  NFL_TEAMS.forEach(t => {
+    const disabled = exclude.includes(t.id) && t.id !== current;
+    const spVal = getSpread(weekNum, t.id);
+    const spLabel = spVal != null ? ' (' + spreadStr(spVal) + ')' : '';
+    html += '<option value="' + t.id + '"' + (t.id === current ? ' selected' : '') + (disabled ? ' disabled' : '') + '>' + t.abbr + ' ' + t.name + spLabel + '</option>';
+  });
+  html += '</select>';
+  return html;
+}
+
+function renderPicksFull() {
+  const el = document.getElementById('sec-picks');
+  const wk = ensureWeek(S.currentWeek);
+  const members = S.settings.members;
+  const editable = isWeekEditable(S.currentWeek);
+
+  if (!picksActiveMember || !members.includes(picksActiveMember)) picksActiveMember = null;
+
+  // If no member selected, show the selection screen
+  if (!picksActiveMember) {
+    el.innerHTML = `
+      <div class="card" style="text-align:center;padding:30px 16px;border-color:var(--gold2);background:var(--gold-bg)">
+        <div style="font-size:32px;margin-bottom:8px">&#127917;</div>
+        <div class="card-title" style="font-size:20px;margin-bottom:6px">Who are you?</div>
+        <div class="card-sub" style="font-size:14px;margin-bottom:20px">Tap your name to enter Week ${S.currentWeek} picks</div>
+        <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto">
+          ${members.map((m, i) => {
+            const complete = isMemberComplete(S.currentWeek, m);
+            return '<button class="btn btn-gold" style="width:100%;padding:16px 20px;font-size:18px;min-height:56px;justify-content:center;border-radius:var(--radius)" onclick="switchPicksMemberIdx(' + i + ')">' + memberDot(m) + ' ' + esc(m) + (complete ? ' &#9989;' : '') + '</button>';
+          }).join('')}
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Week ${S.currentWeek} Status</div>
+        <div style="margin-top:12px">
+          ${members.map(m => {
+            const v = validateMemberPicks(S.currentWeek, m);
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">' + memberDot(m) + ' <strong style="flex:1;margin-left:6px">' + esc(m) + '</strong><span class="badge badge-' + (v.complete ? 'win' : 'pending') + '">' + (v.complete ? 'Complete &#10003;' : v.filled + '/5 picks') + '</span></div>';
+          }).join('')}
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // Member tabs (shown after selection)
+  let tabs = '<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;align-items:center">';
+  tabs += '<button class="btn btn-outline" style="min-height:44px;font-size:14px" onclick="picksActiveMember=null;renderPicksFull()">&#8592; Back</button>';
+  members.forEach((m, i) => {
+    const complete = isMemberComplete(S.currentWeek, m);
+    const active = m === picksActiveMember;
+    tabs += '<button class="btn ' + (active ? 'btn-gold' : 'btn-outline') + '" style="min-height:44px;font-size:14px" onclick="switchPicksMemberIdx(' + i + ')">';
+    tabs += memberDot(m) + ' ' + esc(m);
+    tabs += ' <span class="completion-icon">' + (complete ? '&#9989;' : '&#9898;') + '</span>';
+    tabs += '</button>';
+  });
+  tabs += '</div>';
+
+  // Status
+  const status = getWeekStatus(S.currentWeek);
+  let statusHtml = '';
+  if (wk.finalized) statusHtml = '<div class="alert alert-warn">&#128274; Week ' + S.currentWeek + ' is finalized. Editing requires commissioner override.</div>';
+  else if (!editable) statusHtml = '<div class="alert alert-warn">&#128274; Past deadline — editing locked. Enable commissioner override in Settings to edit.</div>';
+  if (S.settings.commissionerOverride && (wk.finalized || status === 'locked')) {
+    statusHtml = '<div class="override-banner">&#9888; Commissioner Override active — editing unlocked</div>';
+  }
+
+  // Pick grid for active member
+  const memberPicks = wk.picks[picksActiveMember] || [null,null,null,null,null];
+  const exclude = memberPicks.filter(p => p != null);
+  const validation = validateMemberPicks(S.currentWeek, picksActiveMember);
+  const note = wk.notes[picksActiveMember] || '';
+
+  const memberIdx = S.settings.members.indexOf(picksActiveMember);
+  let grid = '<div class="card">';
+  grid += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="card-title">' + memberDot(picksActiveMember) + ' ' + esc(picksActiveMember) + '\'s Picks</div>';
+  grid += '<span class="badge badge-' + (validation.complete ? 'win' : 'pending') + '">' + (validation.complete ? 'Complete' : validation.filled + '/5') + '</span></div>';
+
+  if (validation.errors.length > 0) {
+    grid += '<div class="alert alert-error mb-8">&#9888; ' + validation.errors.map(esc).join('; ') + '</div>';
+  }
+
+  // Desktop table
+  grid += '<div class="desktop-table"><table><thead><tr><th>Rank</th><th>Weight</th><th>Team Selection</th><th>Spread</th></tr></thead><tbody>';
+  for (let slot = 0; slot < 5; slot++) {
+    const current = memberPicks[slot];
+    const sp = current ? getSpread(S.currentWeek, current) : null;
+    const isDup = current && memberPicks.filter(p => p === current).length > 1;
+    grid += '<tr>';
+    grid += '<td class="fw-700">Pick ' + (slot + 1) + '</td>';
+    grid += '<td><span class="pick-weight">' + WEIGHTS[slot] + ' pts</span></td>';
+    grid += '<td>' + (editable ? teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) : '<span class="fw-700">' + (current ? esc(teamLabel(current)) : '—') + '</span>') + (isDup ? ' <span class="tie-indicator">DUPLICATE</span>' : '') + '</td>';
+    grid += '<td class="text-gold">' + spreadStr(sp) + '</td>';
+    grid += '</tr>';
+  }
+  grid += '</tbody></table></div>';
+
+  // Mobile pick cards — big tappable rows
+  grid += '<div class="game-cards">';
+  for (let slot = 0; slot < 5; slot++) {
+    const current = memberPicks[slot];
+    const sp = current ? getSpread(S.currentWeek, current) : null;
+    const isDup = current && memberPicks.filter(p => p === current).length > 1;
+    const weightColors = ['var(--gold)','var(--gold)','var(--blue)','var(--text2)','var(--text3)'];
+    grid += '<div style="background:var(--bg3);border:1px solid ' + (isDup ? 'var(--red)' : 'var(--border)') + ';border-radius:var(--radius);padding:12px;margin-bottom:8px">';
+    grid += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    grid += '<span class="fw-700" style="font-size:15px">Pick ' + (slot + 1) + '</span>';
+    grid += '<span style="background:' + weightColors[slot] + ';color:#000;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700">' + WEIGHTS[slot] + ' pts</span>';
+    grid += '</div>';
+    if (editable) {
+      grid += '<div>' + teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) + '</div>';
+    } else {
+      grid += '<div class="fw-700" style="font-size:16px;padding:8px 0">' + (current ? esc(teamLabel(current)) : '<span class="text-dim">No pick</span>') + '</div>';
+    }
+    if (current) {
+      grid += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px"><span class="text-gold fw-700">Spread: ' + spreadStr(sp) + '</span>';
+      if (isDup) grid += '<span class="text-red fw-700">DUPLICATE</span>';
+      grid += '</div>';
+    }
+    grid += '</div>';
+  }
+  grid += '</div>';
+
+  // Note
+  grid += '<div class="form-group mt-16"><label>Member Note (optional)</label>';
+  grid += editable ? '<textarea id="memberNote" onchange="saveMemberNote()" placeholder="Reasoning, injury notes, etc.">' + esc(note) + '</textarea>' : '<div class="fs-sm text-dim">' + (esc(note) || 'No notes') + '</div>';
+  grid += '</div>';
+
+  // Actions
+  if (editable) {
+    grid += '<div class="btn-group mt-8">';
+    grid += '<button class="btn btn-red btn-sm" onclick="clearMemberPicksUI()">Clear ' + esc(picksActiveMember) + '\'s Picks</button>';
+    grid += '<button class="btn btn-outline btn-sm" onclick="clearWeekPicksUI()">Clear Entire Week</button>';
+    grid += '</div>';
+  }
+
+  grid += '</div>';
+
+  // All members summary — desktop table
+  let summary = '<div class="card"><div class="card-title">All Members — Week ' + S.currentWeek + '</div><div class="card-sub">Quick view of everyone\'s picks</div>';
+  summary += '<div class="table-wrap desktop-table"><table><thead><tr><th>Member</th><th>Pick 1 (5)</th><th>Pick 2 (4)</th><th>Pick 3 (3)</th><th>Pick 4 (2)</th><th>Pick 5 (1)</th><th>Status</th></tr></thead><tbody>';
+  members.forEach(m => {
+    const p = wk.picks[m] || [];
+    const v = validateMemberPicks(S.currentWeek, m);
+    summary += '<tr>';
+    summary += '<td>' + memberDot(m) + ' <strong>' + esc(m) + '</strong></td>';
+    for (let s = 0; s < 5; s++) {
+      const tid = p[s];
+      summary += '<td class="fs-sm">' + (tid ? '<strong>' + esc(teamInfo(tid).abbr) + '</strong>' : '<span class="text-dim">—</span>') + '</td>';
+    }
+    summary += '<td><span class="badge badge-' + (v.complete ? 'win' : 'pending') + '">' + (v.complete ? '&#10003;' : v.filled + '/5') + '</span></td>';
+    summary += '</tr>';
+  });
+  summary += '</tbody></table></div>';
+  // Mobile card summary
+  summary += '<div class="game-cards">';
+  members.forEach(m => {
+    const p = wk.picks[m] || [];
+    const v = validateMemberPicks(S.currentWeek, m);
+    summary += '<div class="game-card">';
+    summary += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' + memberDot(m) + ' <strong style="flex:1;margin-left:4px">' + esc(m) + '</strong><span class="badge badge-' + (v.complete ? 'win' : 'pending') + '">' + (v.complete ? 'Complete' : v.filled + '/5') + '</span></div>';
+    summary += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    for (let s = 0; s < 5; s++) {
+      const tid = p[s];
+      summary += '<div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 8px;font-size:12px"><span class="text-gold fw-700" style="font-size:10px">' + WEIGHTS[s] + '</span> ' + (tid ? '<strong>' + esc(teamInfo(tid).abbr) + '</strong>' : '<span class="text-dim">—</span>') + '</div>';
+    }
+    summary += '</div></div>';
+  });
+  summary += '</div>';
+  if (wk.lastSaved) summary += '<div class="fs-xs text-dim mt-8">Last saved: ' + formatDt(wk.lastSaved) + '</div>';
+  summary += '</div>';
+
+  el.innerHTML = statusHtml + tabs + grid + summary;
+}
+
+function switchPicksMember(name) {
+  picksActiveMember = name;
+  renderPicksFull();
+}
+
+function switchPicksMemberIdx(idx) {
+  picksActiveMember = S.settings.members[idx];
+  renderPicksFull();
+}
+
+function onPickChange(memberIdx, slot, newVal) {
+  const member = S.settings.members[memberIdx];
+  if (!member) return;
+  const wk = ensureWeek(S.currentWeek);
+  if (!wk.picks[member]) wk.picks[member] = [null,null,null,null,null];
+  newVal = newVal || null;
+
+  if (newVal && wk.picks[member].some((p, i) => i !== slot && p === newVal)) {
+    toast(teamInfo(newVal).abbr + ' already selected — choose a different team', 'warn');
+    renderPicksFull();
+    return;
+  }
+
+  wk.picks[member][slot] = newVal;
+
+  if (S.settings.commissionerOverride && (wk.finalized || getWeekStatus(S.currentWeek) === 'locked')) {
+    logActivity('Override edit: ' + member + ' Pick ' + (slot+1) + ' changed in Week ' + S.currentWeek);
+    wk.overrides.push({ time: new Date().toISOString(), action: member + ' Pick ' + (slot+1) + ' changed' });
+  }
+
+  saveState();
+  renderPicksFull();
+}
+
+function saveMemberNote() {
+  const wk = ensureWeek(S.currentWeek);
+  const el = document.getElementById('memberNote');
+  if (el) { wk.notes[picksActiveMember] = el.value; saveState(); }
+}
+
+async function clearMemberPicksUI() {
+  const ok = await showConfirm('Clear Picks', 'Clear all of ' + picksActiveMember + '\'s picks for Week ' + S.currentWeek + '?');
+  if (!ok) return;
+  const wk = ensureWeek(S.currentWeek);
+  wk.picks[picksActiveMember] = [null,null,null,null,null];
+  logActivity('Cleared ' + picksActiveMember + '\'s picks for Week ' + S.currentWeek);
+  saveState();
+  renderPicksFull();
+}
+
+async function clearWeekPicksUI() {
+  const ok = await showConfirm('Clear Week', 'Clear ALL members\' picks for Week ' + S.currentWeek + '? This cannot be undone.');
+  if (!ok) return;
+  const wk = ensureWeek(S.currentWeek);
+  S.settings.members.forEach(m => wk.picks[m] = [null,null,null,null,null]);
+  logActivity('Cleared all picks for Week ' + S.currentWeek);
+  saveState();
+  renderPicksFull();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 17: RENDER — WEIGHTED TALLY
+   ═══════════════════════════════════════════════════════════ */
+let tallyView = 'table';
+
+function renderTallyFull() {
+  const el = document.getElementById('sec-tally');
+  const tally = calculateTally(S.currentWeek);
+  const members = S.settings.members;
+  const wk = ensureWeek(S.currentWeek);
+
+  let html = '<div class="flex-between mb-16"><div><div class="card-title" style="font-size:20px">Weighted Tally — Week ' + S.currentWeek + '</div><div class="fs-sm text-dim">Ranked by consensus support</div></div>';
+  html += '<div class="btn-group"><button class="btn ' + (tallyView==='table'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'table\';renderTallyFull()">Table</button><button class="btn ' + (tallyView==='card'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'card\';renderTallyFull()">Cards</button><button class="btn ' + (tallyView==='matrix'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'matrix\';renderTallyFull()">Matrix</button></div></div>';
+
+  // Tie-breaking display
+  const tbLabels = {score:'Weighted Score',members:'Member Count',pick1:'Pick 1 Count',pick2:'Pick 2 Count',alpha:'Alphabetical'};
+  html += '<div class="fs-xs text-dim mb-8">Tie-break order: ' + S.settings.tieBreaking.map(t => tbLabels[t]||t).join(' → ') + '</div>';
+
+  if (tally.length === 0) {
+    html += '<div class="empty-state"><div class="empty-icon">&#9878;</div><div class="card-title">No picks entered</div><p class="text-dim">Enter picks in the Weekly Picks section to see the tally.</p></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Top 5 highlight
+  html += '<div class="card" style="border-color:var(--gold2);background:var(--gold-bg)">';
+  html += '<div class="card-title text-gold">&#127942; Top 5 Consensus Picks</div>';
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">';
+  tally.slice(0, 5).forEach((t, i) => {
+    html += '<div style="background:var(--bg2);border:1px solid var(--gold2);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:100px">';
+    html += '<div class="fs-xs text-dim">#' + (i+1) + '</div>';
+    html += '<div class="fw-700" style="font-size:16px">' + esc(teamInfo(t.teamId).abbr) + '</div>';
+    html += '<div class="fs-xs">' + esc(teamInfo(t.teamId).name) + '</div>';
+    html += '<div class="text-gold fw-700">' + t.score + ' pts</div>';
+    html += '<div class="fs-xs text-dim">' + t.memberCount + '/5 members</div>';
+    if (i > 0 && hasTie(tally, i)) html += '<div class="tie-indicator">TIE</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  if (tallyView === 'table') {
+    html += '<div class="card"><div class="table-wrap"><table>';
+    html += '<thead><tr><th>#</th><th>Team</th><th>Spread</th><th>Score</th><th>Members</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th>';
+    members.forEach(m => html += '<th>' + esc(m.charAt(0)) + '</th>');
+    html += '<th>Entries</th><th>Tie</th></tr></thead><tbody>';
+
+    tally.forEach((t, i) => {
+      const isTop5 = i < 5;
+      const sp = getSpread(S.currentWeek, t.teamId);
+      const tie = hasTie(tally, i);
+      html += '<tr' + (isTop5 ? ' class="top5-highlight"' : '') + '>';
+      html += '<td class="fw-700 ' + (isTop5 ? 'text-gold' : '') + '">' + (i+1) + '</td>';
+      html += '<td class="fw-700">' + esc(teamLabel(t.teamId)) + '</td>';
+      html += '<td class="text-gold">' + spreadStr(sp) + '</td>';
+      html += '<td class="fw-700">' + t.score + '</td>';
+      html += '<td>' + t.memberCount + '/5</td>';
+      for (let p = 1; p <= 5; p++) html += '<td>' + t['pick' + p] + '</td>';
+      members.forEach(m => {
+        const rank = t.supporters[m];
+        html += '<td>' + (rank ? '<span class="badge badge-win">' + rank + '</span>' : '') + '</td>';
+      });
+      html += '<td>' + t.entryExposure + '/5</td>';
+      html += '<td>' + (tie ? '<span class="tie-indicator">TIE</span>' : '') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  } else if (tallyView === 'card') {
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
+    tally.forEach((t, i) => {
+      const isTop5 = i < 5;
+      html += '<div class="card" style="' + (isTop5 ? 'border-color:var(--gold2)' : '') + '">';
+      html += '<div class="flex-between"><span class="fw-700 ' + (isTop5 ? 'text-gold' : '') + '">#' + (i+1) + '</span>' + (hasTie(tally,i) ? '<span class="tie-indicator">TIE</span>' : '') + '</div>';
+      html += '<div class="fw-700" style="font-size:16px;margin:4px 0">' + esc(teamLabel(t.teamId)) + '</div>';
+      html += '<div class="text-gold fw-700">' + t.score + ' pts</div>';
+      html += '<div class="fs-sm text-dim">' + t.memberCount + ' members | ' + t.entryExposure + ' entries</div>';
+      html += '<div class="mt-8">' + Object.entries(t.supporters).map(([m,r]) => memberDot(m) + '<span class="fs-xs">P' + r + '</span>').join(' ') + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  } else if (tallyView === 'matrix') {
+    html += '<div class="card"><div class="card-title">Member × Team Matrix</div><div class="table-wrap mt-8"><table><thead><tr><th>Team</th>';
+    members.forEach(m => html += '<th>' + memberDot(m) + ' ' + esc(m) + '</th>');
+    html += '<th>Total</th></tr></thead><tbody>';
+    tally.forEach((t, i) => {
+      html += '<tr' + (i < 5 ? ' class="top5-highlight"' : '') + '><td class="fw-700">' + esc(teamInfo(t.teamId).abbr) + '</td>';
+      members.forEach(m => {
+        const rank = t.supporters[m];
+        const w = rank ? WEIGHTS[rank - 1] : 0;
+        const bg = w > 0 ? 'background:rgba(255,215,0,' + (w / 5 * 0.3) + ')' : '';
+        html += '<td class="heatmap-cell" style="' + bg + '">' + (rank ? rank + ' (' + w + ')' : '') + '</td>';
+      });
+      html += '<td class="fw-700 text-gold">' + t.score + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // Export actions
+  html += '<div class="btn-group mt-8 no-print">';
+  html += '<button class="btn btn-outline btn-sm" onclick="copyTallySummary()">&#128203; Copy Summary</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="exportTallyCSV()">&#128229; Export CSV</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="window.print()">&#128424; Print</button>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function copyTallySummary() {
+  const tally = calculateTally(S.currentWeek);
+  let text = 'Week ' + S.currentWeek + ' Weighted Tally\n';
+  tally.slice(0, 10).forEach((t, i) => {
+    text += (i+1) + '. ' + teamLabel(t.teamId) + ' — ' + t.score + ' pts (' + t.memberCount + ' members)\n';
+  });
+  copyText(text);
+}
+
+function exportTallyCSV() {
+  const tally = calculateTally(S.currentWeek);
+  const members = S.settings.members;
+  const rows = [['Rank','Team','Score','Members','Pick1','Pick2','Pick3','Pick4','Pick5',...members,'Entries']];
+  tally.forEach((t, i) => {
+    rows.push([i+1, teamLabel(t.teamId), t.score, t.memberCount, t.pick1, t.pick2, t.pick3, t.pick4, t.pick5, ...members.map(m => t.supporters[m] || ''), t.entryExposure]);
+  });
+  exportCSV(rows, 'tally-week-' + S.currentWeek + '.csv');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 18: RENDER — FIVE ENTRIES
+   ═══════════════════════════════════════════════════════════ */
+function renderEntriesFull() {
+  const el = document.getElementById('sec-entries');
+  const wk = ensureWeek(S.currentWeek);
+  const tally = calculateTally(S.currentWeek);
+  const top5 = tally.slice(0, 5).map(t => t.teamId);
+  const editable = isWeekEditable(S.currentWeek);
+
+  // Check if consensus changed since manual edits
+  let consensusWarning = '';
+  const anyManual = wk.entries.some(e => e.manuallyEdited && (e.status === 'approved' || e.status === 'locked'));
+  if (anyManual && top5.length > 0) {
+    consensusWarning = '<div class="alert alert-warn">&#9888; Consensus has changed since entries were manually edited. Review entries or <button class="btn btn-outline btn-sm" onclick="refreshFromTally()">Refresh From Current Tally</button></div>';
+  }
+
+  let html = '<div class="flex-between mb-16"><div><div class="card-title" style="font-size:20px">Five Contest Entries — Week ' + S.currentWeek + '</div><div class="fs-sm text-dim">Each entry needs 5 unique teams</div></div></div>';
+
+  // Mode buttons
+  if (editable) {
+    html += '<div class="card"><div class="card-title">Entry Mode</div><div class="btn-group mt-8">';
+    html += '<button class="btn btn-outline" onclick="setEntryModeManual()">MODE A — Manual</button>';
+    html += '<button class="btn btn-outline" onclick="applyConsensusCopy()">MODE B — Consensus Copy</button>';
+    html += '<button class="btn btn-gold" onclick="applyDiversified()">MODE C — Diversified Suggestion</button>';
+    html += '</div><div class="fs-xs text-dim mt-8">Manual: build each entry by hand. Consensus Copy: all 5 entries = Top 5. Diversified: algorithmic spread across entries.</div></div>';
+  }
+
+  html += consensusWarning;
+
+  // Entry cards
+  for (let i = 0; i < 5; i++) {
+    const entry = wk.entries[i];
+    const v = validateEntry(entry);
+    const entryPicks = entry.picks || [];
+    const isLocked = entry.status === 'locked' || entry.status === 'finalized';
+    const consensusCount = entryPicks.filter(t => t && top5.includes(t)).length;
+    const totalScore = entryPicks.reduce((sum, tid) => {
+      if (!tid) return sum;
+      const t = tally.find(x => x.teamId === tid);
+      return sum + (t ? t.score : 0);
+    }, 0);
+
+    // Check for frozen line differences
+    let lineDiffWarning = '';
+    if (wk.frozenLines && wk.frozenLines[i]) {
+      Object.entries(wk.frozenLines[i]).forEach(([tid, frozenSp]) => {
+        const currentSp = getSpread(S.currentWeek, tid);
+        if (currentSp != null && frozenSp != null && currentSp !== frozenSp) {
+          lineDiffWarning += '<div class="fs-xs text-dim">&#9888; ' + teamInfo(tid).abbr + ': frozen ' + spreadStr(frozenSp) + ' → current ' + spreadStr(currentSp) + '</div>';
+        }
+      });
+    }
+
+    html += '<div class="entry-card ' + (entry.status === 'locked' ? 'locked' : entry.status === 'finalized' ? 'finalized' : '') + '">';
+    html += '<div class="flex-between mb-8">';
+    html += '<div class="card-title">Entry ' + (i+1) + '</div>';
+    html += '<div class="flex-center">';
+    html += '<span class="badge badge-' + (entry.status === 'finalized' ? 'finalized' : entry.status === 'locked' ? 'locked' : entry.status === 'approved' ? 'approved' : v.valid ? 'open' : 'draft') + '">' + entry.status.toUpperCase() + '</span>';
+    html += '</div></div>';
+
+    // Stats
+    html += '<div class="flex-center fs-xs text-dim mb-8">';
+    html += '<span>Score: <strong class="text-gold">' + totalScore + '</strong></span>';
+    html += '<span>Consensus: <strong>' + consensusCount + '/5</strong></span>';
+    html += '<span>' + (v.valid ? '<span class="text-green">Valid</span>' : '<span class="text-red">' + esc(v.msg) + '</span>') + '</span>';
+    if (entry.manuallyEdited) html += '<span class="text-dim">(manually edited)</span>';
+    html += '</div>';
+
+    if (lineDiffWarning) html += '<div class="alert alert-info fs-xs">' + lineDiffWarning + '</div>';
+
+    // Pick slots
+    html += '<table><thead><tr><th>#</th><th>Team</th><th>Spread</th><th>Consensus?</th></tr></thead><tbody>';
+    for (let s = 0; s < 5; s++) {
+      const tid = entryPicks[s];
+      const sp = tid ? getSpread(S.currentWeek, tid) : null;
+      const inTop5 = tid && top5.includes(tid);
+      const isDup = tid && entryPicks.filter(p => p === tid).length > 1;
+      const otherPicks = entryPicks.filter((p, pi) => pi !== s && p != null);
+
+      html += '<tr>';
+      html += '<td class="fw-700">' + (s+1) + '</td>';
+      if (editable && !isLocked) {
+        html += '<td><select onchange="setEntryPick(' + i + ',' + s + ',this.value)" style="min-width:150px">';
+        html += '<option value="">— Select —</option>';
+        tally.forEach(t => {
+          const disabled = otherPicks.includes(t.teamId);
+          html += '<option value="' + t.teamId + '"' + (t.teamId === tid ? ' selected' : '') + (disabled ? ' disabled' : '') + '>' + t.teamId + ' ' + teamInfo(t.teamId).name + ' (' + t.score + 'pts)</option>';
+        });
+        // Include non-tally teams too
+        NFL_TEAMS.forEach(t => {
+          if (!tally.find(x => x.teamId === t.id)) {
+            const disabled = otherPicks.includes(t.id);
+            html += '<option value="' + t.id + '"' + (t.id === tid ? ' selected' : '') + (disabled ? ' disabled' : '') + '>' + t.id + ' ' + t.name + '</option>';
+          }
+        });
+        html += '</select>' + (isDup ? ' <span class="tie-indicator">DUP</span>' : '') + '</td>';
+      } else {
+        html += '<td class="fw-700">' + (tid ? esc(teamLabel(tid)) : '<span class="text-dim">—</span>') + '</td>';
+      }
+      html += '<td class="text-gold">' + spreadStr(sp) + '</td>';
+      html += '<td>' + (inTop5 ? '<span class="badge badge-win">Top 5</span>' : '') + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+
+    // Entry actions
+    if (editable) {
+      html += '<div class="btn-group mt-8">';
+      if (!isLocked) {
+        html += '<button class="btn btn-green btn-sm" onclick="lockEntry(' + i + ')" ' + (!v.valid ? 'disabled' : '') + '>&#128274; Lock</button>';
+        html += '<button class="btn btn-outline btn-sm" onclick="approveEntry(' + i + ')">&#10003; Approve</button>';
+        html += '<button class="btn btn-outline btn-sm" onclick="resetEntry(' + i + ')">Reset</button>';
+      } else {
+        html += '<button class="btn btn-outline btn-sm" onclick="unlockEntry(' + i + ')">Unlock</button>';
+      }
+      html += '</div>';
+    }
+
+    if (entry.notes) html += '<div class="fs-xs text-dim mt-8">Notes: ' + esc(entry.notes) + '</div>';
+    html += '</div>';
+  }
+
+  // Exposure summary
+  if (tally.length > 0) {
+    const exposure = {};
+    tally.forEach(t => exposure[t.teamId] = 0);
+    wk.entries.forEach(e => (e.picks||[]).forEach(tid => { if(tid && exposure[tid] !== undefined) exposure[tid]++; }));
+    const exposed = Object.entries(exposure).filter(([,c]) => c > 0).sort((a,b) => b[1] - a[1]);
+    if (exposed.length > 0) {
+      html += '<div class="card"><div class="card-title">Team Exposure Across 5 Entries</div><div class="mt-8">';
+      exposed.forEach(([tid, count]) => {
+        const pct = count / 5 * 100;
+        const warn = count > (S.settings.diversification.maxExposure || 4);
+        html += '<div class="flex-between fs-sm" style="margin-bottom:4px"><span class="fw-700">' + esc(teamInfo(tid).abbr) + '</span><div style="flex:1;margin:0 12px"><div style="background:var(--bg);border-radius:3px;height:8px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + (warn ? 'var(--red)' : 'var(--gold)') + ';border-radius:3px"></div></div></div><span>' + count + '/5' + (warn ? ' &#9888;' : '') + '</span></div>';
+      });
+      html += '</div></div>';
+    }
+  }
+
+  // Bottom actions
+  html += '<div class="btn-group mt-8 no-print">';
+  html += '<button class="btn btn-outline btn-sm" onclick="copyEntriesSummary()">&#128203; Copy Submission Text</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="exportEntriesCSV()">&#128229; Export CSV</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="window.print()">&#128424; Print Entries</button>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function setEntryPick(entryIdx, slot, val) {
+  const wk = ensureWeek(S.currentWeek);
+  wk.entries[entryIdx].picks[slot] = val || null;
+  wk.entries[entryIdx].manuallyEdited = true;
+  if (wk.entries[entryIdx].status === 'draft') wk.entries[entryIdx].status = 'draft';
+  saveState();
+  renderEntriesFull();
+}
+
+function setEntryModeManual() { toast('Manual mode active — edit each entry directly', 'info'); }
+
+async function applyConsensusCopy() {
+  const top5 = getTop5(S.currentWeek);
+  if (top5.length < 5) { toast('Need at least 5 teams in the tally', 'warn'); return; }
+  const ok = await showConfirm('Consensus Copy', 'All 5 entries will be set to the Top 5 consensus picks. All entries will be identical. Continue?');
+  if (!ok) return;
+  populateConsensus(S.currentWeek);
+  renderEntriesFull();
+  toast('All entries set to consensus', 'success');
+}
+
+async function applyDiversified() {
+  const tally = calculateTally(S.currentWeek);
+  if (tally.length < 5) { toast('Need at least 5 teams in the tally', 'warn'); return; }
+  const hasManual = ensureWeek(S.currentWeek).entries.some(e => e.manuallyEdited);
+  if (hasManual) {
+    const ok = await showConfirm('Overwrite Entries', 'Some entries were manually edited. Generate diversified suggestions will overwrite them. Continue?');
+    if (!ok) return;
+  }
+  generateDiversified(S.currentWeek);
+  renderEntriesFull();
+  toast('Diversified entries generated', 'success');
+}
+
+async function refreshFromTally() {
+  const ok = await showConfirm('Refresh Entries', 'Reset all entries from current tally? Manual edits will be lost.');
+  if (!ok) return;
+  generateDiversified(S.currentWeek);
+  renderEntriesFull();
+}
+
+function lockEntry(idx) {
+  const wk = ensureWeek(S.currentWeek);
+  wk.entries[idx].status = 'locked';
+  logActivity('Entry ' + (idx+1) + ' locked for Week ' + S.currentWeek);
+  saveState();
+  renderEntriesFull();
+}
+
+function approveEntry(idx) {
+  const wk = ensureWeek(S.currentWeek);
+  wk.entries[idx].status = 'approved';
+  saveState();
+  renderEntriesFull();
+}
+
+function unlockEntry(idx) {
+  const wk = ensureWeek(S.currentWeek);
+  wk.entries[idx].status = 'draft';
+  logActivity('Entry ' + (idx+1) + ' unlocked for Week ' + S.currentWeek);
+  saveState();
+  renderEntriesFull();
+}
+
+function resetEntry(idx) {
+  const wk = ensureWeek(S.currentWeek);
+  wk.entries[idx] = {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false};
+  saveState();
+  renderEntriesFull();
+}
+
+function copyEntriesSummary() {
+  const wk = ensureWeek(S.currentWeek);
+  let text = 'Circa Pool — Week ' + S.currentWeek + ' Entries\n\n';
+  wk.entries.forEach((e, i) => {
+    text += 'Entry ' + (i+1) + ': ' + (e.picks||[]).map(tid => tid ? teamInfo(tid).abbr : '?').join(', ') + '\n';
+  });
+  copyText(text);
+}
+
+function exportEntriesCSV() {
+  const wk = ensureWeek(S.currentWeek);
+  const rows = [['Entry','Pick 1','Pick 2','Pick 3','Pick 4','Pick 5','Status']];
+  wk.entries.forEach((e, i) => {
+    rows.push(['Entry ' + (i+1), ...(e.picks||[]).map(tid => tid || ''), e.status]);
+  });
+  exportCSV(rows, 'entries-week-' + S.currentWeek + '.csv');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 19: RENDER — RESULTS
+   ═══════════════════════════════════════════════════════════ */
+let resultFilter = 'all';
+let resultUndoStack = [];
+
+function renderResultsFull() {
+  const el = document.getElementById('sec-results');
+  const wk = ensureWeek(S.currentWeek);
+  const members = S.settings.members;
+
+  // Gather all unique teams selected this week (by members or entries)
+  const selectedTeams = new Set();
+  members.forEach(m => (wk.picks[m]||[]).forEach(t => { if(t) selectedTeams.add(t); }));
+  wk.entries.forEach(e => (e.picks||[]).forEach(t => { if(t) selectedTeams.add(t); }));
+  const teamList = [...selectedTeams].sort();
+
+  const editable = isWeekEditable(S.currentWeek);
+  const pending = teamList.filter(t => !wk.results[t] || wk.results[t] === 'pending');
+  const completed = teamList.filter(t => wk.results[t] && wk.results[t] !== 'pending');
+
+  // Filter
+  let displayed = teamList;
+  if (resultFilter === 'pending') displayed = pending;
+  else if (resultFilter === 'completed') displayed = completed;
+
+  let html = '<div class="flex-between mb-16"><div><div class="card-title" style="font-size:20px">Results — Week ' + S.currentWeek + '</div><div class="fs-sm text-dim">' + completed.length + '/' + teamList.length + ' results entered</div></div>';
+  html += '<div class="btn-group">';
+  html += '<button class="btn ' + (resultFilter==='all'?'btn-gold':'btn-outline') + ' btn-sm" onclick="resultFilter=\'all\';renderResultsFull()">All</button>';
+  html += '<button class="btn ' + (resultFilter==='pending'?'btn-gold':'btn-outline') + ' btn-sm" onclick="resultFilter=\'pending\';renderResultsFull()">Pending (' + pending.length + ')</button>';
+  html += '<button class="btn ' + (resultFilter==='completed'?'btn-gold':'btn-outline') + ' btn-sm" onclick="resultFilter=\'completed\';renderResultsFull()">Completed (' + completed.length + ')</button>';
+  html += '</div></div>';
+
+  if (teamList.length === 0) {
+    html += '<div class="empty-state"><div class="empty-icon">&#9989;</div><div class="card-title">No picks to score</div><p class="text-dim">Enter picks first, then return here to enter results.</p></div>';
+    el.innerHTML = html;
+    return;
+  }
+
+  // Bulk entry
+  html += '<div class="card"><div class="card-title">Enter Results</div>';
+  html += '<div class="table-wrap mt-8"><table><thead><tr><th>Team</th><th>Spread</th><th>Members</th><th>Entries</th><th>Result</th></tr></thead><tbody>';
+
+  displayed.forEach(tid => {
+    const sp = getSpread(S.currentWeek, tid);
+    const result = wk.results[tid] || 'pending';
+    const membersWith = members.filter(m => (wk.picks[m]||[]).includes(tid));
+    const entriesWith = wk.entries.filter(e => (e.picks||[]).includes(tid)).length;
+
+    html += '<tr>';
+    html += '<td class="fw-700">' + esc(teamLabel(tid)) + '</td>';
+    html += '<td class="text-gold">' + spreadStr(sp) + '</td>';
+    html += '<td>' + membersWith.map(m => memberDot(m)).join('') + ' <span class="fs-xs text-dim">(' + membersWith.length + ')</span></td>';
+    html += '<td class="fs-sm">' + entriesWith + '/5</td>';
+    html += '<td>';
+    if (editable) {
+      html += '<select onchange="setResult(\'' + tid + '\',this.value)" style="width:auto">';
+      RESULT_TYPES.forEach(r => {
+        html += '<option value="' + r + '"' + (result === r ? ' selected' : '') + '>' + r.charAt(0).toUpperCase() + r.slice(1) + '</option>';
+      });
+      html += '</select>';
+    } else {
+      html += '<span class="badge badge-' + result + '">' + result.toUpperCase() + '</span>';
+    }
+    html += '</td></tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+
+  // Undo
+  if (resultUndoStack.length > 0 && editable) {
+    html += '<button class="btn btn-outline btn-sm mt-8" onclick="undoLastResult()">&#8617; Undo Last Result Change</button>';
+  }
+
+  // Week results summary
+  let totalW=0,totalL=0,totalP=0;
+  displayed.forEach(tid => {
+    const r = wk.results[tid];
+    if (r === 'win') totalW++;
+    else if (r === 'loss') totalL++;
+    else if (r === 'push') totalP++;
+  });
+
+  if (completed.length > 0) {
+    html += '<div class="card"><div class="card-title">Week ' + S.currentWeek + ' Summary</div>';
+    // Member results
+    html += '<div class="card-sub">Member Results</div><div class="table-wrap"><table><thead><tr><th>Member</th><th>W</th><th>L</th><th>P</th><th>Points</th></tr></thead><tbody>';
+    members.forEach(m => {
+      const r = getMemberWeeklyResults(S.currentWeek, m);
+      html += '<tr><td>' + memberDot(m) + ' ' + esc(m) + '</td><td class="text-green fw-700">' + r.w + '</td><td class="text-red">' + r.l + '</td><td class="text-gold">' + r.p + '</td><td class="fw-700">' + r.pts + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+
+    // Entry results
+    html += '<div class="card-sub mt-16">Entry Results</div><div class="table-wrap"><table><thead><tr><th>Entry</th><th>W</th><th>L</th><th>P</th><th>Points</th></tr></thead><tbody>';
+    for (let i = 0; i < 5; i++) {
+      const r = getEntryWeeklyResults(S.currentWeek, i);
+      html += '<tr><td class="fw-700">Entry ' + (i+1) + '</td><td class="text-green fw-700">' + r.w + '</td><td class="text-red">' + r.l + '</td><td class="text-gold">' + r.p + '</td><td class="fw-700">' + r.pts + '</td></tr>';
+    }
+    html += '</tbody></table></div></div>';
+  }
+
+  // Actions
+  html += '<div class="btn-group mt-8 no-print">';
+  if (editable) html += '<button class="btn btn-red btn-sm" onclick="clearResults()">Clear Results</button>';
+  html += '</div>';
+
+  el.innerHTML = html;
+}
+
+function setResult(teamId, result) {
+  const wk = ensureWeek(S.currentWeek);
+  const old = wk.results[teamId] || 'pending';
+  resultUndoStack.push({ teamId, old });
+  wk.results[teamId] = result;
+  logActivity(teamInfo(teamId).abbr + ' marked ' + result + ' in Week ' + S.currentWeek);
+  saveState();
+  renderResultsFull();
+}
+
+function undoLastResult() {
+  const undo = resultUndoStack.pop();
+  if (!undo) return;
+  const wk = ensureWeek(S.currentWeek);
+  wk.results[undo.teamId] = undo.old;
+  saveState();
+  toast('Undone: ' + teamInfo(undo.teamId).abbr + ' back to ' + undo.old, 'info');
+  renderResultsFull();
+}
+
+async function clearResults() {
+  const ok = await showConfirm('Clear Results', 'Reset all results for Week ' + S.currentWeek + ' to Pending?');
+  if (!ok) return;
+  const wk = ensureWeek(S.currentWeek);
+  Object.keys(wk.results).forEach(k => wk.results[k] = 'pending');
+  logActivity('Cleared results for Week ' + S.currentWeek);
+  saveState();
+  renderResultsFull();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 20: RENDER — SEASON SUMMARY
+   ═══════════════════════════════════════════════════════════ */
+function renderSeasonFull() {
+  const el = document.getElementById('sec-season');
+  const members = S.settings.members;
+
+  let html = '<div class="card-title" style="font-size:20px;margin-bottom:16px">Season Summary — ' + S.settings.season + '</div>';
+
+  // Member performance
+  html += '<div class="card"><div class="card-title">Member Performance</div><div class="table-wrap mt-8"><table>';
+  html += '<thead><tr><th>Member</th><th>W</th><th>L</th><th>P</th><th>Season Pts</th><th>Weeks</th><th>Picks</th><th>Avg/Wk</th></tr></thead><tbody>';
+  members.forEach(m => {
+    const s = getMemberSeasonStats(m);
+    html += '<tr><td>' + memberDot(m) + ' <strong>' + esc(m) + '</strong></td>';
+    html += '<td class="text-green fw-700">' + s.w + '</td><td class="text-red">' + s.l + '</td><td class="text-gold">' + s.p + '</td>';
+    html += '<td class="fw-700 text-gold">' + s.pts + '</td><td>' + s.weeksPlayed + '</td><td>' + s.totalPicks + '</td><td>' + s.avg + '</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  // Entry performance
+  html += '<div class="card"><div class="card-title">Entry Performance</div><div class="table-wrap mt-8"><table>';
+  html += '<thead><tr><th>Entry</th><th>W</th><th>L</th><th>P</th><th>Season Pts</th><th>Weeks</th><th>Avg/Wk</th><th>Best Wk</th><th>Worst Wk</th></tr></thead><tbody>';
+  const entryStats = [];
+  for (let i = 0; i < 5; i++) {
+    const s = getEntrySeasonStats(i);
+    entryStats.push({idx:i,...s});
+    html += '<tr><td class="fw-700">Entry ' + (i+1) + '</td>';
+    html += '<td class="text-green fw-700">' + s.w + '</td><td class="text-red">' + s.l + '</td><td class="text-gold">' + s.p + '</td>';
+    html += '<td class="fw-700 text-gold">' + s.pts + '</td><td>' + s.weeksPlayed + '</td><td>' + s.avg + '</td>';
+    html += '<td>' + (s.bestWk ? 'Wk ' + s.bestWk + ' (' + s.best + ')' : '—') + '</td>';
+    html += '<td>' + (s.worstWk ? 'Wk ' + s.worstWk + ' (' + s.worst + ')' : '—') + '</td></tr>';
+  }
+  html += '</tbody></table></div>';
+
+  // Entry ranking
+  const ranked = [...entryStats].sort((a,b) => b.pts - a.pts);
+  html += '<div class="card-sub mt-8">Current Ranking:</div><div>';
+  ranked.forEach((e, i) => {
+    html += '<div class="flex-between fs-sm" style="padding:4px 0"><span class="fw-700">#' + (i+1) + ' Entry ' + (e.idx+1) + '</span><span class="text-gold fw-700">' + e.pts + ' pts</span></div>';
+  });
+  html += '</div></div>';
+
+  // Week-by-week breakdown
+  html += '<div class="card"><div class="card-title">Week-by-Week</div><div class="table-wrap mt-8"><table><thead><tr><th>Week</th>';
+  members.forEach(m => html += '<th>' + esc(m.charAt(0)) + '</th>');
+  for (let i = 0; i < 5; i++) html += '<th>E' + (i+1) + '</th>';
+  html += '<th>Status</th></tr></thead><tbody>';
+
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
+    const weekData = S.weeks[w];
+    if (!weekData) {
+      html += '<tr><td class="fw-700">Wk ' + w + '</td><td colspan="' + (members.length + 6) + '" class="text-dim fs-sm">No data</td></tr>';
+      continue;
+    }
+    html += '<tr><td class="fw-700">Wk ' + w + '</td>';
+    members.forEach(m => {
+      const r = getMemberWeeklyResults(w, m);
+      html += '<td class="fs-sm">' + (r.total > 0 ? r.w + '-' + r.l + '-' + r.p : '<span class="text-dim">—</span>') + '</td>';
+    });
+    for (let i = 0; i < 5; i++) {
+      const r = getEntryWeeklyResults(w, i);
+      html += '<td class="fs-sm">' + (r.total > 0 ? '<span class="text-gold fw-700">' + r.pts + '</span>' : '<span class="text-dim">—</span>') + '</td>';
+    }
+    html += '<td><span class="badge badge-' + (weekData.finalized ? 'finalized' : 'open') + '">' + (weekData.finalized ? 'Final' : 'Open') + '</span></td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></div>';
+
+  // Simple visual chart (CSS bar chart)
+  html += '<div class="card"><div class="card-title">Entry Points by Week</div><div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">';
+  for (let i = 0; i < 5; i++) {
+    html += '<div style="flex:1;min-width:150px"><div class="fs-sm fw-700 mb-8">Entry ' + (i+1) + '</div><div class="bar-chart">';
+    for (let w = 1; w <= TOTAL_WEEKS; w++) {
+      const r = getEntryWeeklyResults(w, i);
+      const h = r.pts * 16;
+      html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center"><div class="bar" style="height:' + h + 'px;width:100%;max-width:24px;background:' + (r.pts >= 4 ? 'var(--green)' : r.pts >= 2 ? 'var(--gold)' : r.total > 0 ? 'var(--red)' : 'var(--border)') + '"></div><div class="bar-label">' + w + '</div></div>';
+    }
+    html += '</div></div>';
+  }
+  html += '</div></div>';
+
+  // Export
+  html += '<div class="btn-group mt-8 no-print"><button class="btn btn-outline btn-sm" onclick="exportSeasonCSV()">&#128229; Export CSV</button><button class="btn btn-outline btn-sm" onclick="exportSeasonJSON()">&#128229; Export JSON</button><button class="btn btn-outline btn-sm" onclick="window.print()">&#128424; Print</button></div>';
+
+  el.innerHTML = html;
+}
+
+function exportSeasonCSV() {
+  const members = S.settings.members;
+  const rows = [['Week', ...members.map(m => m + ' Pts'), 'E1 Pts','E2 Pts','E3 Pts','E4 Pts','E5 Pts']];
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
+    const row = ['Week ' + w];
+    members.forEach(m => row.push(getMemberWeeklyResults(w, m).pts));
+    for (let i = 0; i < 5; i++) row.push(getEntryWeeklyResults(w, i).pts);
+    rows.push(row);
+  }
+  exportCSV(rows, 'season-summary-' + S.settings.season + '.csv');
+}
+
+function exportSeasonJSON() {
+  const data = { season: S.settings.season, members: {}, entries: {} };
+  S.settings.members.forEach(m => data.members[m] = getMemberSeasonStats(m));
+  for (let i = 0; i < 5; i++) data.entries['Entry ' + (i+1)] = getEntrySeasonStats(i);
+  downloadFile(JSON.stringify(data, null, 2), 'season-summary-' + S.settings.season + '.json');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 21: RENDER — TEAM FREQUENCY
+   ═══════════════════════════════════════════════════════════ */
+let freqFilter = { member: null, minFreq: 0 };
+
+function renderFrequencyFull() {
+  const el = document.getElementById('sec-frequency');
+  const members = S.settings.members;
+  const freq = calculateFrequency(freqFilter);
+  const filtered = freq.filter(f => f.total >= freqFilter.minFreq);
+  const sorted = filtered.sort((a,b) => b.total - a.total);
+
+  let html = '<div class="flex-between mb-16"><div><div class="card-title" style="font-size:20px">Team Frequency Report</div><div class="fs-sm text-dim">How often each team is selected</div></div></div>';
+
+  // Filters
+  html += '<div class="card"><div class="form-row"><div class="form-group"><label>Member Filter</label><select onchange="freqFilter.member=this.value||null;renderFrequencyFull()"><option value="">All Members</option>';
+  members.forEach(m => html += '<option value="' + esc(m) + '"' + (freqFilter.member === m ? ' selected' : '') + '>' + esc(m) + '</option>');
+  html += '</select></div><div class="form-group"><label>Min Frequency</label><input type="number" value="' + freqFilter.minFreq + '" min="0" onchange="freqFilter.minFreq=parseInt(this.value)||0;renderFrequencyFull()"></div></div></div>';
+
+  // Top teams summary
+  const topUsed = sorted.slice(0, 5);
+  const leastUsed = sorted.filter(f => f.total > 0).slice(-5).reverse();
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+  html += '<div class="card"><div class="card-title fs-sm">Most Selected</div>';
+  topUsed.forEach(f => html += '<div class="flex-between fs-sm" style="padding:3px 0"><span class="fw-700">' + esc(teamInfo(f.teamId).abbr) + '</span><span>' + f.total + 'x</span></div>');
+  html += '</div>';
+  html += '<div class="card"><div class="card-title fs-sm">Least Selected</div>';
+  leastUsed.forEach(f => html += '<div class="flex-between fs-sm" style="padding:3px 0"><span class="fw-700">' + esc(teamInfo(f.teamId).abbr) + '</span><span>' + f.total + 'x</span></div>');
+  html += '</div></div>';
+
+  // Main table
+  html += '<div class="card"><div class="table-wrap"><table><thead><tr><th>Team</th><th>Total</th>';
+  members.forEach(m => html += '<th>' + esc(m.charAt(0)) + '</th>');
+  html += '<th>Wt Pts</th><th>Avg Rank</th>';
+  for (let i = 0; i < 5; i++) html += '<th>E' + (i+1) + '</th>';
+  html += '<th>Entry Tot</th><th>W</th><th>L</th><th>P</th><th>Res Pts</th></tr></thead><tbody>';
+
+  sorted.forEach(f => {
+    if (f.total === 0 && freqFilter.minFreq <= 0) {
+      html += '<tr><td class="fw-700 text-dim">' + esc(teamInfo(f.teamId).abbr) + '</td><td class="text-dim">0</td>';
+      html += '<td colspan="' + (members.length + 10) + '" class="text-dim">—</td></tr>';
+      return;
+    }
+    if (f.total === 0) return;
+    html += '<tr><td class="fw-700">' + esc(teamLabel(f.teamId)) + '</td>';
+    html += '<td class="fw-700">' + f.total + '</td>';
+    members.forEach(m => {
+      const cnt = f.byMember[m] || 0;
+      const bg = cnt > 0 ? 'background:rgba(255,215,0,' + Math.min(cnt / 5, 1) * 0.3 + ')' : '';
+      html += '<td class="heatmap-cell" style="' + bg + '">' + (cnt || '') + '</td>';
+    });
+    html += '<td class="text-gold">' + f.weightedPts + '</td>';
+    html += '<td>' + f.avgRank + '</td>';
+    for (let i = 0; i < 5; i++) html += '<td>' + (f.entryUse[i] || '') + '</td>';
+    html += '<td>' + f.entryTotal + '</td>';
+    html += '<td class="text-green">' + f.w + '</td><td class="text-red">' + f.l + '</td><td class="text-gold">' + f.p + '</td><td class="fw-700">' + f.resultPts + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+
+  html += '<div class="btn-group mt-8 no-print"><button class="btn btn-outline btn-sm" onclick="exportFreqCSV()">&#128229; Export CSV</button><button class="btn btn-outline btn-sm" onclick="window.print()">&#128424; Print</button></div>';
+
+  el.innerHTML = html;
+}
+
+function exportFreqCSV() {
+  const members = S.settings.members;
+  const freq = calculateFrequency(freqFilter).filter(f => f.total > 0).sort((a,b) => b.total - a.total);
+  const rows = [['Team','Total',...members,'Wt Pts','Avg Rank','E1','E2','E3','E4','E5','Entry Total','W','L','P','Res Pts']];
+  freq.forEach(f => {
+    rows.push([teamLabel(f.teamId), f.total, ...members.map(m => f.byMember[m]||0), f.weightedPts, f.avgRank, ...f.entryUse, f.entryTotal, f.w, f.l, f.p, f.resultPts]);
+  });
+  exportCSV(rows, 'team-frequency-' + S.settings.season + '.csv');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 22: RENDER — LINES & SPREADS
+   ═══════════════════════════════════════════════════════════ */
+function renderLinesFull() {
+  const el = document.getElementById('sec-lines');
+  const wk = ensureWeek(S.currentWeek);
+  const lines = wk.lines || {};
+  const contestLines = wk.contestLines || {};
+  const lineCount = Object.keys(lines).length;
+  const contestCount = Object.keys(contestLines).length;
+  const editable = isWeekEditable(S.currentWeek);
+
+  // Group games by matchup
+  const games = {};
+  Object.entries(lines).forEach(([tid, line]) => {
+    if (line.homeAway === 'home') {
+      games[tid] = { home: tid, away: line.opponent, marketSpread: line.spread, gameDate: line.gameDate, source: line.source, lastUpdate: line.lastUpdate };
+    }
+  });
+  const gameList = Object.values(games).sort((a,b) => (a.gameDate||'').localeCompare(b.gameDate||''));
+
+  let html = '<div style="margin-bottom:16px"><div class="card-title" style="font-size:20px">Lines & Spreads — Week ' + S.currentWeek + '</div><div class="fs-sm text-dim">' + gameList.length + ' games | ' + contestCount + ' contest lines locked</div>';
+  html += '<div style="margin-top:10px"><button class="btn btn-gold" onclick="fetchESPNLinesUI()">&#9889; Fetch Live Lines</button></div></div>';
+
+  // ═══ UNIFIED GAME BOARD ═══
+  html += '<div class="card"><div class="card-title">&#127944; Week ' + S.currentWeek + ' Game Board</div>';
+  html += '<div class="card-sub">Market lines, contest lines, and movement at a glance</div>';
+
+  if (gameList.length === 0 && contestCount === 0) {
+    html += '<div class="empty-state mt-8"><div class="empty-icon">&#128178;</div><div class="fw-700" style="margin-bottom:6px">No lines loaded yet</div><p class="text-dim">Tap "Fetch Live Lines" above to pull current spreads.</p></div>';
+  } else {
+
+    // ── DESKTOP TABLE ──
+    html += '<div class="table-wrap mt-8 desktop-table"><table><thead><tr>';
+    html += '<th>Away</th><th></th><th>Home</th><th>Date / Time</th>';
+    html += '<th style="text-align:center">Market Line</th>';
+    html += '<th style="text-align:center;color:var(--gold)">Contest Line</th>';
+    html += '<th style="text-align:center">Move</th>';
+    html += '<th>Source</th>';
+    html += '</tr></thead><tbody>';
+
+    gameList.forEach(g => {
+      const awayInfo = teamInfo(g.away);
+      const homeInfo = teamInfo(g.home);
+      const cs = getContestSpread(S.currentWeek, g.home);
+      const ms = g.marketSpread;
+      const diff = (cs != null && ms != null) ? (ms - cs) : null;
+      const diffAbs = diff != null ? Math.abs(diff) : 0;
+      const diffStr = diff != null ? (diff === 0 ? '—' : (diff > 0 ? '+' + diff.toFixed(1) : diff.toFixed(1))) : '';
+      const diffColor = diffAbs >= 2 ? 'var(--red)' : diffAbs > 0 ? 'var(--orange)' : 'var(--green)';
+
+      html += '<tr>';
+      html += '<td class="fw-700" style="font-size:15px">' + esc(awayInfo.abbr) + ' <span class="fs-xs text-dim">' + esc(awayInfo.name) + '</span></td>';
+      html += '<td class="text-dim fs-sm">@</td>';
+      html += '<td class="fw-700" style="font-size:15px">' + esc(homeInfo.abbr) + ' <span class="fs-xs text-dim">' + esc(homeInfo.name) + '</span></td>';
+      html += '<td class="fs-sm">' + esc(g.gameDate || '—') + '</td>';
+      html += '<td style="text-align:center"><span class="fw-700" style="font-size:15px">' + (ms != null ? esc(homeInfo.abbr) + ' ' + spreadStr(ms) : '<span class="text-dim">—</span>') + '</span></td>';
+      html += '<td style="text-align:center">';
+      if (cs != null) html += '<span class="fw-700 text-gold" style="font-size:15px">' + esc(homeInfo.abbr) + ' ' + spreadStr(cs) + '</span> <span class="badge badge-finalized">LOCKED</span>';
+      else html += '<span class="text-dim fs-sm">Not set</span>';
+      html += '</td>';
+      html += '<td style="text-align:center">';
+      if (diff != null && diff !== 0) html += '<span style="color:' + diffColor + ';font-weight:700;font-size:13px">' + diffStr + '</span>';
+      else if (diff === 0) html += '<span class="text-green fs-sm">= No move</span>';
+      html += '</td>';
+      html += '<td class="fs-xs text-dim">' + esc(g.source || '') + '</td>';
+      html += '</tr>';
+    });
+
+    const marketHomeTeams = new Set(gameList.map(g => g.home));
+    const marketAwayTeams = new Set(gameList.map(g => g.away));
+    Object.entries(contestLines).forEach(([tid, cl]) => {
+      if (!marketHomeTeams.has(tid) && !marketAwayTeams.has(tid)) {
+        html += '<tr><td colspan="3" class="fw-700">' + esc(teamLabel(tid)) + '</td><td class="text-dim fs-sm">—</td>';
+        html += '<td style="text-align:center" class="text-dim">—</td>';
+        html += '<td style="text-align:center"><span class="fw-700 text-gold">' + spreadStr(cl.spread) + '</span> <span class="badge badge-finalized">LOCKED</span></td>';
+        html += '<td></td><td class="fs-xs text-dim">Circa Contest</td></tr>';
+      }
+    });
+    html += '</tbody></table></div>';
+
+    // ── MOBILE GAME CARDS ──
+    html += '<div class="game-cards">';
+    gameList.forEach(g => {
+      const awayInfo = teamInfo(g.away);
+      const homeInfo = teamInfo(g.home);
+      const cs = getContestSpread(S.currentWeek, g.home);
+      const ms = g.marketSpread;
+      const diff = (cs != null && ms != null) ? (ms - cs) : null;
+      const diffAbs = diff != null ? Math.abs(diff) : 0;
+      const diffColor = diffAbs >= 2 ? 'var(--red)' : diffAbs > 0 ? 'var(--orange)' : 'var(--green)';
+
+      html += '<div class="game-card">';
+      html += '<div class="game-card-matchup">';
+      html += '<span class="game-card-team">' + esc(awayInfo.abbr) + '</span>';
+      html += '<span class="game-card-at">@</span>';
+      html += '<span class="game-card-team">' + esc(homeInfo.abbr) + '</span>';
+      html += '</div>';
+      html += '<div class="game-card-lines">';
+      html += '<div class="game-card-line"><div class="game-card-line-label">Market</div><div class="game-card-line-val">' + (ms != null ? esc(homeInfo.abbr) + ' ' + spreadStr(ms) : '—') + '</div></div>';
+      html += '<div class="game-card-line" style="' + (cs != null ? 'border-color:var(--gold2);background:var(--gold-bg)' : '') + '"><div class="game-card-line-label" style="color:var(--gold)">Contest</div><div class="game-card-line-val">';
+      if (cs != null) html += '<span class="text-gold">' + esc(homeInfo.abbr) + ' ' + spreadStr(cs) + '</span>';
+      else html += '<span class="text-dim">—</span>';
+      html += '</div></div>';
+      html += '</div>';
+      html += '<div class="game-card-meta"><span>' + esc(g.gameDate || '') + '</span>';
+      if (diff != null && diff !== 0) html += '<span style="color:' + diffColor + ';font-weight:700">Move: ' + (diff > 0 ? '+' : '') + diff.toFixed(1) + '</span>';
+      else if (diff === 0) html += '<span class="text-green">No movement</span>';
+      html += '</div></div>';
+    });
+    // Contest-only lines as cards
+    Object.entries(contestLines).forEach(([tid, cl]) => {
+      if (!marketHomeTeams.has(tid) && !marketAwayTeams.has(tid)) {
+        html += '<div class="game-card"><div class="game-card-matchup"><span class="game-card-team">' + esc(teamLabel(tid)) + '</span></div>';
+        html += '<div class="game-card-lines"><div class="game-card-line"><div class="game-card-line-label">Market</div><div class="game-card-line-val text-dim">—</div></div>';
+        html += '<div class="game-card-line" style="border-color:var(--gold2);background:var(--gold-bg)"><div class="game-card-line-label" style="color:var(--gold)">Contest</div><div class="game-card-line-val text-gold">' + spreadStr(cl.spread) + '</div></div></div></div>';
+      }
+    });
+    html += '</div>';
+  }
+
+  const anyLine = Object.values(lines)[0];
+  if (anyLine && anyLine.lastUpdate) {
+    html += '<div class="fs-xs text-dim mt-8">Last fetched: ' + formatDt(anyLine.lastUpdate) + '</div>';
+  }
+  html += '</div>';
+
+  // ═══ ACTIONS BAR ═══
+  html += '<div class="card"><div class="flex-between"><div class="card-title">Actions</div></div>';
+  html += '<div class="btn-group mt-8">';
+  if (lineCount > 0 && editable) html += '<button class="btn btn-gold btn-sm" onclick="copyMarketToContest()">&#128274; Copy Market → Contest Lines</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="showLinesCSVImport()">Paste CSV</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="showLinesJSONImport()">Paste JSON</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="exportLinesCSV()">Export CSV</button>';
+  if (lineCount > 0) html += '<button class="btn btn-red btn-sm" onclick="clearLines()">Clear Market Lines</button>';
+  html += '</div>';
+  if (lineCount > 0 && editable) html += '<div class="fs-xs text-dim mt-8">"Copy Market → Contest" locks the current market spreads as your Circa contest lines. Once locked, they will not change even if you refresh market lines.</div>';
+  html += '</div>';
+
+  // ═══ MANUAL CONTEST LINE ENTRY ═══
+  if (editable) {
+    html += '<div class="card" style="border-color:var(--gold2)"><div class="card-title text-gold">Add/Edit Contest Line</div>';
+    html += '<div class="card-sub">Manually enter or override individual Circa contest spreads</div>';
+    html += '<div class="form-row mt-8">';
+    html += '<div class="form-group"><label>Team</label><select id="contestLineTeam"><option value="">Select Team...</option>';
+    NFL_TEAMS.forEach(t => html += '<option value="' + t.id + '">' + t.abbr + ' ' + t.name + '</option>');
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Contest Spread</label><input type="number" step="0.5" id="contestLineSpread" placeholder="-3.5"></div>';
+    html += '</div>';
+    html += '<button class="btn btn-gold btn-sm" onclick="addContestLine()">&#128274; Lock Contest Line</button>';
+    html += '</div>';
+  }
+
+  // Manual add
+  if (editable) {
+    html += '<div class="card"><div class="card-title">Add/Edit Line Manually</div>';
+    html += '<div class="form-row mt-8">';
+    html += '<div class="form-group"><label>Team</label><select id="lineTeam">';
+    html += '<option value="">Select...</option>';
+    NFL_TEAMS.forEach(t => html += '<option value="' + t.id + '">' + t.abbr + ' ' + t.name + '</option>');
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Opponent</label><select id="lineOpp"><option value="">Select...</option>';
+    NFL_TEAMS.forEach(t => html += '<option value="' + t.id + '">' + t.abbr + ' ' + t.name + '</option>');
+    html += '</select></div>';
+    html += '<div class="form-group"><label>Spread</label><input type="number" step="0.5" id="lineSpread" placeholder="-3.5"></div>';
+    html += '<div class="form-group"><label>Home/Away</label><select id="lineHA"><option value="home">Home</option><option value="away">Away</option><option value="neutral">Neutral</option></select></div>';
+    html += '</div>';
+    html += '<div class="form-row"><div class="form-group"><label>Game Date/Time</label><input type="text" id="lineDate" placeholder="Sun Sep 7, 1:00 PM"></div>';
+    html += '<div class="form-group"><label>Notes</label><input type="text" id="lineNotes" placeholder="Optional notes"></div></div>';
+    html += '<button class="btn btn-gold btn-sm" onclick="addManualLine()">Add Line</button>';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function addManualLine() {
+  const tid = document.getElementById('lineTeam').value;
+  if (!tid) { toast('Select a team', 'warn'); return; }
+  const wk = ensureWeek(S.currentWeek);
+  wk.lines[tid] = {
+    spread: parseFloat(document.getElementById('lineSpread').value) || null,
+    opponent: document.getElementById('lineOpp').value || '',
+    homeAway: document.getElementById('lineHA').value || '',
+    gameDate: document.getElementById('lineDate').value || '',
+    source: 'Manual',
+    sourceTimestamp: new Date().toISOString(),
+    manual: true,
+    lastUpdate: new Date().toISOString(),
+    notes: document.getElementById('lineNotes').value || ''
+  };
+  saveState();
+  toast(teamInfo(tid).abbr + ' line added', 'success');
+  logActivity('Manual line added: ' + teamInfo(tid).abbr + ' ' + spreadStr(wk.lines[tid].spread));
+  renderLinesFull();
+}
+
+function editLine(tid) {
+  const wk = ensureWeek(S.currentWeek);
+  const line = wk.lines[tid];
+  if (!line) return;
+  document.getElementById('lineTeam').value = tid;
+  document.getElementById('lineOpp').value = line.opponent || '';
+  document.getElementById('lineSpread').value = line.spread ?? '';
+  document.getElementById('lineHA').value = line.homeAway || 'home';
+  document.getElementById('lineDate').value = line.gameDate || '';
+  document.getElementById('lineNotes').value = line.notes || '';
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function removeLine(tid) {
+  const wk = ensureWeek(S.currentWeek);
+  delete wk.lines[tid];
+  saveState();
+  renderLinesFull();
+}
+
+function fetchLinesUI() {
+  fetchLinesForWeek(S.currentWeek).then(() => renderLinesFull());
+}
+
+async function fetchESPNLinesUI() {
+  // ESPN is primary — no API key needed, reliable
+  const espnCount = await fetchESPNLinesForWeek(S.currentWeek);
+  if (espnCount > 0) { renderLinesFull(); return; }
+
+  // Fall back to Odds API if ESPN returned nothing and key is configured
+  if (S.settings.oddsApiKey) {
+    toast('ESPN returned no data, trying Odds API...', 'warn');
+    const oddsCount = await fetchOddsAPILines(S.currentWeek);
+    if (oddsCount > 0) { renderLinesFull(); return; }
+  }
+
+  toast('Could not fetch lines. ESPN may not have data for Week ' + S.currentWeek + ' yet.', 'error');
+  renderLinesFull();
+}
+
+function addContestLine() {
+  const tid = document.getElementById('contestLineTeam').value;
+  const spread = document.getElementById('contestLineSpread').value;
+  if (!tid) { toast('Select a team', 'warn'); return; }
+  if (spread === '') { toast('Enter a spread', 'warn'); return; }
+  setContestLine(S.currentWeek, tid, spread);
+  toast(teamInfo(tid).abbr + ' contest line locked at ' + spreadStr(parseFloat(spread)), 'success');
+  logActivity('Contest line set: ' + teamInfo(tid).abbr + ' ' + spreadStr(parseFloat(spread)) + ' Week ' + S.currentWeek);
+  renderLinesFull();
+}
+
+function removeContestLine(tid) {
+  const wk = ensureWeek(S.currentWeek);
+  if (wk.contestLines) delete wk.contestLines[tid];
+  saveState();
+  renderLinesFull();
+}
+
+async function copyMarketToContest() {
+  const wk = ensureWeek(S.currentWeek);
+  const existing = Object.keys(wk.contestLines || {}).length;
+  if (existing > 0) {
+    const ok = await showConfirm('Overwrite Contest Lines', 'This will replace ' + existing + ' existing contest lines with current market lines. Contest lines are meant to be locked. Continue?');
+    if (!ok) return;
+  }
+  if (!wk.contestLines) wk.contestLines = {};
+  let count = 0;
+  Object.entries(wk.lines || {}).forEach(([tid, line]) => {
+    if (line.spread != null) {
+      wk.contestLines[tid] = {
+        spread: line.spread,
+        lockedAt: new Date().toISOString(),
+        source: 'Copied from market'
+      };
+      count++;
+    }
+  });
+  saveState();
+  toast(count + ' market lines copied to contest lines', 'success');
+  logActivity('Copied ' + count + ' market lines to contest lines for Week ' + S.currentWeek);
+  renderLinesFull();
+}
+
+function showLinesCSVImport() {
+  openGenericModal('<div class="modal-title">Import Lines from CSV</div><div class="fs-sm text-dim mb-8">Format: Team,Spread,Opponent,Home/Away,GameDate (one per line, header optional)</div><textarea id="csvLinesInput" rows="8" placeholder="KC,-3,BAL,home,Sun Sep 7"></textarea><div class="modal-actions"><button class="btn btn-outline" onclick="closeGenericModal()">Cancel</button><button class="btn btn-gold" onclick="importLinesFromCSV(' + S.currentWeek + ',document.getElementById(\'csvLinesInput\').value);closeGenericModal();renderLinesFull()">Import</button></div>');
+}
+
+function showLinesJSONImport() {
+  openGenericModal('<div class="modal-title">Import Lines from JSON</div><div class="fs-sm text-dim mb-8">Array of objects with team, spread, opponent, homeAway, gameDate fields</div><textarea id="jsonLinesInput" rows="8" placeholder=\'[{"team":"KC","spread":-3,"opponent":"BAL"}]\'></textarea><div class="modal-actions"><button class="btn btn-outline" onclick="closeGenericModal()">Cancel</button><button class="btn btn-gold" onclick="importLinesFromJSON(' + S.currentWeek + ',document.getElementById(\'jsonLinesInput\').value);closeGenericModal();renderLinesFull()">Import</button></div>');
+}
+
+function exportLinesCSV() {
+  const wk = ensureWeek(S.currentWeek);
+  const rows = [['Team','Spread','Opponent','Home/Away','Game Date','Source','Notes']];
+  Object.entries(wk.lines).forEach(([tid, l]) => {
+    rows.push([tid, l.spread, l.opponent, l.homeAway, l.gameDate, l.source, l.notes]);
+  });
+  exportCSV(rows, 'lines-week-' + S.currentWeek + '.csv');
+}
+
+async function clearLines() {
+  const ok = await showConfirm('Clear Lines', 'Remove all lines for Week ' + S.currentWeek + '?');
+  if (!ok) return;
+  ensureWeek(S.currentWeek).lines = {};
+  saveState();
+  logActivity('Cleared lines for Week ' + S.currentWeek);
+  renderLinesFull();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 23: INITIALIZATION
+   ═══════════════════════════════════════════════════════════ */
+function init() {
+  try {
+    loadState();
+    document.body.setAttribute('data-theme', S.settings.theme || 'dark');
+    populateWeekSelector();
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+    renderCurrentSection();
+  } catch(err) {
+    console.error('Init error:', err);
+    document.querySelector('.main-content').innerHTML = '<div style="background:var(--red-bg);border:1px solid var(--red);border-radius:8px;padding:20px;margin:20px;color:var(--red);font-size:15px"><strong>Error loading app:</strong> ' + err.message + '<br><br>Try clearing site data: Settings → Safari → Clear History and Website Data, then reopen this file.</div>';
+  }
+}
+
+init();
+
+</script>
+</body>
+</html>
