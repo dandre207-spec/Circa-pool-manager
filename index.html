@@ -2131,12 +2131,15 @@ function renderPicksFull() {
 
   const memberIdx = S.settings.members.indexOf(picksActiveMember);
   const isOwnPicks = S.settings.activeMember === picksActiveMember;
-  const canEdit = editable && isOwnPicks;
+  const isSubmitted = wk.finalized === true;
+  const canEdit = isOwnPicks && !isSubmitted;
   let grid = '<div class="card">';
   grid += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="card-title">' + memberDot(picksActiveMember) + ' ' + esc(picksActiveMember) + '\'s Picks</div>';
   grid += '<span class="badge badge-' + (validation.complete ? 'win' : 'pending') + '">' + (validation.complete ? 'Complete' : validation.filled + '/5') + '</span></div>';
 
-  if (!isOwnPicks) {
+  if (isSubmitted) {
+    grid += '<div class="alert alert-warn mb-8">&#128274; Week ' + S.currentWeek + ' has been submitted. Picks are locked.</div>';
+  } else if (!isOwnPicks) {
     grid += '<div class="alert alert-info mb-8">&#128064; Viewing ' + esc(picksActiveMember) + '\'s picks (read-only). Switch to your tab to edit your own.</div>';
   }
 
@@ -2145,7 +2148,7 @@ function renderPicksFull() {
   }
 
   // Desktop table
-  grid += '<div class="desktop-table"><table><thead><tr><th>Rank</th><th>Weight</th><th>Team Selection</th><th>Spread</th></tr></thead><tbody>';
+  grid += '<div class="desktop-table"><table><thead><tr><th>Rank</th><th>Weight</th><th>Team Selection</th><th>Spread</th>' + (canEdit ? '<th></th>' : '') + '</tr></thead><tbody>';
   for (let slot = 0; slot < 5; slot++) {
     const current = memberPicks[slot];
     const sp = current ? getSpread(S.currentWeek, current) : null;
@@ -2155,6 +2158,7 @@ function renderPicksFull() {
     grid += '<td><span class="pick-weight">' + WEIGHTS[slot] + ' pts</span></td>';
     grid += '<td>' + (canEdit ? teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) : '<span class="fw-700">' + (current ? esc(teamLabel(current)) + (sp != null ? ' <span class="text-gold fs-sm">(' + spreadStr(sp) + ')</span>' : '') : '—') + '</span>') + (isDup ? ' <span class="tie-indicator">DUPLICATE</span>' : '') + '</td>';
     grid += '<td class="text-gold">' + spreadStr(sp) + '</td>';
+    if (canEdit) grid += '<td>' + (current ? '<button class="btn btn-outline btn-sm" style="padding:2px 8px;min-height:auto;color:var(--red);border-color:var(--red)" onclick="clearSinglePick(' + memberIdx + ',' + slot + ')" title="Clear this pick">&#10005;</button>' : '') + '</td>';
     grid += '</tr>';
   }
   grid += '</tbody></table></div>';
@@ -2172,7 +2176,10 @@ function renderPicksFull() {
     grid += '<span style="background:' + weightColors[slot] + ';color:#000;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700">' + WEIGHTS[slot] + ' pts</span>';
     grid += '</div>';
     if (canEdit) {
-      grid += '<div>' + teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) + '</div>';
+      grid += '<div style="display:flex;gap:8px;align-items:center">';
+      grid += '<div style="flex:1">' + teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) + '</div>';
+      if (current) grid += '<button class="btn btn-outline btn-sm" style="padding:6px 10px;min-height:auto;color:var(--red);border-color:var(--red);flex-shrink:0" onclick="clearSinglePick(' + memberIdx + ',' + slot + ')" title="Clear this pick">&#10005;</button>';
+      grid += '</div>';
     } else {
       grid += '<div class="fw-700" style="font-size:16px;padding:8px 0">' + (current ? esc(teamLabel(current)) + (sp != null ? ' <span class="text-gold" style="font-size:13px">(' + spreadStr(sp) + ')</span>' : '') : '<span class="text-dim">No pick</span>') + '</div>';
     }
@@ -2249,7 +2256,9 @@ function switchPicksMemberIdx(idx) {
 function onPickChange(memberIdx, slot, newVal) {
   const member = S.settings.members[memberIdx];
   if (!member) return;
+  if (S.settings.activeMember !== member) { toast('You can only edit your own picks', 'warn'); renderPicksFull(); return; }
   const wk = ensureWeek(S.currentWeek);
+  if (wk.finalized) { toast('Week is submitted — picks are locked', 'warn'); renderPicksFull(); return; }
   if (!wk.picks[member]) wk.picks[member] = [null,null,null,null,null];
   newVal = newVal || null;
 
@@ -2276,23 +2285,27 @@ function saveMemberNote() {
   if (el) { wk.notes[picksActiveMember] = el.value; saveState(); }
 }
 
-async function clearMemberPicksUI() {
-  const ok = await showConfirm('Clear Picks', 'Clear all of ' + picksActiveMember + '\'s picks for Week ' + S.currentWeek + '?');
-  if (!ok) return;
+function clearSinglePick(memberIdx, slot) {
+  const member = S.settings.members[memberIdx];
+  if (!member || S.settings.activeMember !== member) return;
   const wk = ensureWeek(S.currentWeek);
-  wk.picks[picksActiveMember] = [null,null,null,null,null];
-  logActivity('Cleared ' + picksActiveMember + '\'s picks for Week ' + S.currentWeek);
-  saveState();
+  if (wk.finalized) { toast('Week is submitted — picks are locked', 'warn'); return; }
+  const old = wk.picks[member][slot];
+  wk.picks[member][slot] = null;
+  if (old) logActivity(member + ' cleared Pick ' + (slot + 1) + ' (' + teamLabel(old) + ') for Week ' + S.currentWeek);
+  saveAndSync();
   renderPicksFull();
 }
 
-async function clearWeekPicksUI() {
-  const ok = await showConfirm('Clear Week', 'Clear ALL members\' picks for Week ' + S.currentWeek + '? This cannot be undone.');
-  if (!ok) return;
+async function clearMemberPicksUI() {
+  if (S.settings.activeMember !== picksActiveMember) return;
   const wk = ensureWeek(S.currentWeek);
-  S.settings.members.forEach(m => wk.picks[m] = [null,null,null,null,null]);
-  logActivity('Cleared all picks for Week ' + S.currentWeek);
-  saveState();
+  if (wk.finalized) { toast('Week is submitted — picks are locked', 'warn'); return; }
+  const ok = await showConfirm('Clear Picks', 'Clear all of your picks for Week ' + S.currentWeek + '?');
+  if (!ok) return;
+  wk.picks[picksActiveMember] = [null,null,null,null,null];
+  logActivity('Cleared ' + picksActiveMember + '\'s picks for Week ' + S.currentWeek);
+  saveAndSync();
   renderPicksFull();
 }
 
