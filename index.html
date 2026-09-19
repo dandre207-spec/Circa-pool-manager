@@ -3524,9 +3524,59 @@ function updateMemberBanner() {
 /* ═══════════════════════════════════════════════════════════
    SECTION 25: INITIALIZATION
    ═══════════════════════════════════════════════════════════ */
+function seedHistoricalData() {
+  const hasData = S.weeks[1] && S.settings.members.some(function(m) {
+    return S.weeks[1].picks[m] && S.weeks[1].picks[m].some(function(p) { return p; });
+  });
+  if (hasData) return;
+
+  // Week 1 picks from Google Sheet
+  var w1 = ensureWeek(1);
+  w1.picks['Errol']   = ['DAL','PIT','KC','CIN','HOU'];
+  w1.picks['Marlon']  = ['PIT','DET','MIN','CIN','NYG'];
+  w1.picks['DeMarlo'] = ['PIT','DET','MIN','JAX','LAC'];
+  w1.picks['Alan']    = ['PIT','TB','CHI','BAL','LAC'];
+  w1.picks["D'"]      = ['PIT','DAL','PHI','IND','DET'];
+
+  // Week 1 results (3-2): Steelers W, Cowboys W, Lions L, Vikings W, Bengals L
+  w1.results = { 'PIT':'win', 'DAL':'win', 'DET':'loss', 'MIN':'win', 'CIN':'loss',
+                 'KC':'win', 'HOU':'loss', 'NYG':'loss', 'JAX':'win', 'LAC':'win',
+                 'TB':'loss', 'CHI':'win', 'BAL':'loss', 'PHI':'win', 'IND':'loss' };
+
+  // Week 1 entries (our submission was the top 5 consensus)
+  w1.entries[0] = {picks:['PIT','DAL','DET','MIN','CIN'],status:'finalized',notes:'Top 5 consensus',manuallyEdited:false};
+  w1.entries[1] = {picks:['PIT','DAL','DET','MIN','CIN'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+  w1.entries[2] = {picks:['PIT','DAL','DET','MIN','CIN'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+  w1.entries[3] = {picks:['PIT','DAL','DET','MIN','CIN'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+  w1.entries[4] = {picks:['PIT','DAL','DET','MIN','CIN'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+  w1.finalized = true;
+
+  // Week 2 picks from Google Sheet
+  var w2 = ensureWeek(2);
+  w2.picks['Errol']   = ['LAR','KC','GB','PHI','PIT'];
+  w2.picks['Marlon']  = ['CAR','MIN','PHI','JAX','DAL'];
+  w2.picks['DeMarlo'] = ['PHI','SF','KC','BAL','DEN'];
+  w2.picks['Alan']    = ['PHI','KC','SEA','BAL','CAR'];
+  w2.picks["D'"]      = ['SEA','LAR','LAC','CAR','DEN'];
+
+  // Week 2 entries (top 5 submission: Eagles, Chiefs, Rams, Panthers, Seahawks)
+  w2.entries[0] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Top 5 consensus',manuallyEdited:false};
+  w2.entries[1] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+  w2.entries[2] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+  w2.entries[3] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+  w2.entries[4] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
+
+  // Set current week to 2
+  S.currentWeek = 2;
+
+  logActivity('Historical data loaded: Week 1 (3-2) and Week 2 picks from Google Sheet');
+  saveStateLocal();
+}
+
 function init() {
   try {
     loadState();
+    seedHistoricalData();
     document.body.setAttribute('data-theme', S.settings.theme || 'dark');
     populateWeekSelector();
     updateCountdown();
