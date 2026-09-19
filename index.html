@@ -2130,11 +2130,17 @@ function renderPicksFull() {
   const note = wk.notes[picksActiveMember] || '';
 
   const memberIdx = S.settings.members.indexOf(picksActiveMember);
+  const isOwnPicks = S.settings.activeMember === picksActiveMember;
+  const canEdit = editable && isOwnPicks;
   let grid = '<div class="card">';
   grid += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="card-title">' + memberDot(picksActiveMember) + ' ' + esc(picksActiveMember) + '\'s Picks</div>';
   grid += '<span class="badge badge-' + (validation.complete ? 'win' : 'pending') + '">' + (validation.complete ? 'Complete' : validation.filled + '/5') + '</span></div>';
 
-  if (validation.errors.length > 0) {
+  if (!isOwnPicks) {
+    grid += '<div class="alert alert-info mb-8">&#128064; Viewing ' + esc(picksActiveMember) + '\'s picks (read-only). Switch to your tab to edit your own.</div>';
+  }
+
+  if (validation.errors.length > 0 && isOwnPicks) {
     grid += '<div class="alert alert-error mb-8">&#9888; ' + validation.errors.map(esc).join('; ') + '</div>';
   }
 
@@ -2147,7 +2153,7 @@ function renderPicksFull() {
     grid += '<tr>';
     grid += '<td class="fw-700">Pick ' + (slot + 1) + '</td>';
     grid += '<td><span class="pick-weight">' + WEIGHTS[slot] + ' pts</span></td>';
-    grid += '<td>' + (editable ? teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) : '<span class="fw-700">' + (current ? esc(teamLabel(current)) : '—') + '</span>') + (isDup ? ' <span class="tie-indicator">DUPLICATE</span>' : '') + '</td>';
+    grid += '<td>' + (canEdit ? teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) : '<span class="fw-700">' + (current ? esc(teamLabel(current)) + (sp != null ? ' <span class="text-gold fs-sm">(' + spreadStr(sp) + ')</span>' : '') : '—') + '</span>') + (isDup ? ' <span class="tie-indicator">DUPLICATE</span>' : '') + '</td>';
     grid += '<td class="text-gold">' + spreadStr(sp) + '</td>';
     grid += '</tr>';
   }
@@ -2165,10 +2171,10 @@ function renderPicksFull() {
     grid += '<span class="fw-700" style="font-size:15px">Pick ' + (slot + 1) + '</span>';
     grid += '<span style="background:' + weightColors[slot] + ';color:#000;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700">' + WEIGHTS[slot] + ' pts</span>';
     grid += '</div>';
-    if (editable) {
+    if (canEdit) {
       grid += '<div>' + teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) + '</div>';
     } else {
-      grid += '<div class="fw-700" style="font-size:16px;padding:8px 0">' + (current ? esc(teamLabel(current)) : '<span class="text-dim">No pick</span>') + '</div>';
+      grid += '<div class="fw-700" style="font-size:16px;padding:8px 0">' + (current ? esc(teamLabel(current)) + (sp != null ? ' <span class="text-gold" style="font-size:13px">(' + spreadStr(sp) + ')</span>' : '') : '<span class="text-dim">No pick</span>') + '</div>';
     }
     if (current) {
       grid += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px"><span class="text-gold fw-700">Spread: ' + spreadStr(sp) + '</span>';
@@ -2181,14 +2187,13 @@ function renderPicksFull() {
 
   // Note
   grid += '<div class="form-group mt-16"><label>Member Note (optional)</label>';
-  grid += editable ? '<textarea id="memberNote" onchange="saveMemberNote()" placeholder="Reasoning, injury notes, etc.">' + esc(note) + '</textarea>' : '<div class="fs-sm text-dim">' + (esc(note) || 'No notes') + '</div>';
+  grid += canEdit ? '<textarea id="memberNote" onchange="saveMemberNote()" placeholder="Reasoning, injury notes, etc.">' + esc(note) + '</textarea>' : '<div class="fs-sm text-dim">' + (esc(note) || 'No notes') + '</div>';
   grid += '</div>';
 
-  // Actions
-  if (editable) {
+  // Actions — only allow clearing your own picks
+  if (editable && S.settings.activeMember === picksActiveMember) {
     grid += '<div class="btn-group mt-8">';
-    grid += '<button class="btn btn-red btn-sm" onclick="clearMemberPicksUI()">Clear ' + esc(picksActiveMember) + '\'s Picks</button>';
-    grid += '<button class="btn btn-outline btn-sm" onclick="clearWeekPicksUI()">Clear Entire Week</button>';
+    grid += '<button class="btn btn-red btn-sm" onclick="clearMemberPicksUI()">Clear My Picks</button>';
     grid += '</div>';
   }
 
@@ -3558,6 +3563,17 @@ function seedHistoricalData() {
   w2.picks['DeMarlo'] = ['PHI','SF','KC','BAL','DEN'];
   w2.picks['Alan']    = ['PHI','KC','SEA','BAL','CAR'];
   w2.picks["D'"]      = ['SEA','LAR','LAC','CAR','DEN'];
+
+  // Week 2 contest lines from Google Sheet
+  var w2lines = {
+    'PHI':-7, 'KC':-6.5, 'LAR':-7, 'CAR':-2.5, 'SEA':-4,
+    'SF':-13, 'BAL':-8.5, 'MIN':4.5, 'LAC':-6.5, 'GB':-3.5,
+    'PIT':5.5, 'DAL':-4, 'JAX':2.5, 'DEN':-2.5
+  };
+  for (var tid in w2lines) {
+    w2.contestLines[tid] = { spread: w2lines[tid], lockedAt: '2026-09-13T00:00:00Z', source: 'Circa Contest' };
+    w2.lines[tid] = { spread: w2lines[tid], source: 'Circa Contest', manual: true, lastUpdate: '2026-09-13T00:00:00Z' };
+  }
 
   // Week 2 entries (top 5 submission: Eagles, Chiefs, Rams, Panthers, Seahawks)
   w2.entries[0] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Top 5 consensus',manuallyEdited:false};
