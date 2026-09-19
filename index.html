@@ -473,7 +473,7 @@ function defaultSettings() {
     linesProviderLabel: '',
     oddsApiKey: '',
     diversification: { poolSize: 10, minConsensus: 3, maxExposure: 4 },
-    commissionerOverride: false,
+    commissionerOverride: true,
     theme: 'dark',
     appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxHDkvbK72dtGTJNU8Y9QBQRm8ew5RZQQBScTbTEZ7mzJR8I3wajpPvY_zh0N1X17af/exec',
     autoSync: true,
@@ -2064,7 +2064,7 @@ function renderPicksFull() {
   const el = document.getElementById('sec-picks');
   const wk = ensureWeek(S.currentWeek);
   const members = S.settings.members;
-  const editable = isWeekEditable(S.currentWeek);
+  const editable = true;
 
   if (!picksActiveMember || !members.includes(picksActiveMember)) {
     if (S.settings.activeMember && members.includes(S.settings.activeMember)) {
