@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Circa Pool">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d1117">
-<title>Circa Pool Manager</title>
+<title>Circa Pool Manager — Syndicate Tool</title>
 <style>
 /* ═══ THEME VARIABLES ═══ */
 :root {
@@ -173,6 +173,26 @@ tr:hover td{background:var(--bg3)}
 
 .progress-ring{width:40px;height:40px}
 
+/* ═══ SYNC STATUS ═══ */
+.sync-connected{background:var(--green-bg);color:var(--green)}
+.sync-syncing{background:var(--blue-bg);color:var(--blue);animation:syncPulse 1s infinite}
+.sync-error{background:var(--red-bg);color:var(--red)}
+.sync-offline{background:var(--orange-bg);color:var(--orange)}
+@keyframes syncPulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ═══ MEMBER BANNER ═══ */
+.member-banner{background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px}
+.member-banner-name{font-weight:700;color:var(--gold)}
+.member-banner .btn{padding:4px 10px;font-size:11px;min-height:auto}
+
+/* ═══ SETUP OVERLAY ═══ */
+.setup-overlay{position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px}
+.setup-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:440px;width:100%}
+.setup-title{font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--gold),#ffed8a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.setup-sub{color:var(--text2);font-size:14px;margin-bottom:24px}
+.member-select-btn{display:block;width:100%;padding:16px;margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg3);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;transition:.2s;text-align:center}
+.member-select-btn:hover,.member-select-btn:focus{border-color:var(--gold);background:var(--gold-bg);color:var(--gold)}
+
 /* ═══ RESPONSIVE ═══ */
 /* ═══ MOBILE BOTTOM NAV BAR ═══ */
 .mobile-bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:200;padding:0;padding-bottom:env(safe-area-inset-bottom,0)}
@@ -261,6 +281,7 @@ tr:hover td{background:var(--bg3)}
     <span id="seasonBadge" class="badge badge-pending">2026</span>
     <select id="globalWeek" class="week-select" onchange="onWeekChange()"></select>
     <span id="deadlineCountdown" class="countdown countdown-open"></span>
+    <span id="syncIndicator" class="badge badge-pending" style="cursor:pointer;font-size:10px" onclick="manualSync()" title="Click to sync with Google Sheet">&#9679; Offline</span>
     <button class="mobile-menu-btn" onclick="toggleMobileNav()">&#9776;</button>
   </div>
 </div>
@@ -289,6 +310,23 @@ tr:hover td{background:var(--bg3)}
     This tool requires JavaScript to work. If you're viewing this from an email or file preview, tap the <strong>Share</strong> button (box with arrow) and choose <strong>"Open in Safari"</strong> to use the full app.
   </div>
 </noscript>
+
+<!-- ═══ MEMBER BANNER (shown after setup) ═══ -->
+<div class="member-banner" id="memberBanner" style="display:none">
+  <span>Logged in as</span>
+  <span class="member-banner-name" id="memberBannerName"></span>
+  <button class="btn btn-outline" onclick="switchMember()">Switch</button>
+</div>
+
+<!-- ═══ MEMBER SETUP OVERLAY ═══ -->
+<div class="setup-overlay" id="setupOverlay" style="display:none">
+  <div class="setup-card">
+    <div style="font-size:48px;margin-bottom:12px">&#127942;</div>
+    <div class="setup-title">CIRCA POOL MANAGER</div>
+    <div class="setup-sub">Welcome to the syndicate. Who are you?</div>
+    <div id="setupMemberList"></div>
+  </div>
+</div>
 
 <!-- ═══ MAIN CONTENT ═══ -->
 <div class="main-content">
@@ -436,7 +474,10 @@ function defaultSettings() {
     oddsApiKey: '',
     diversification: { poolSize: 10, minConsensus: 3, maxExposure: 4 },
     commissionerOverride: false,
-    theme: 'dark'
+    theme: 'dark',
+    appsScriptUrl: '',
+    autoSync: true,
+    activeMember: ''
   };
 }
 
@@ -497,6 +538,16 @@ function saveState() {
     store.setItem(STORAGE_KEY, JSON.stringify(S));
   } catch(e) {
     toast('Save failed: ' + e.message, 'error');
+  }
+}
+
+function saveAndSync() {
+  saveState();
+  if (SheetSync.getUrl() && S.settings.autoSync && S.settings.activeMember) {
+    const wk = S.weeks[S.currentWeek];
+    if (wk && wk.picks[S.settings.activeMember]) {
+      SheetSync.pushPicks(S.currentWeek, S.settings.activeMember, wk.picks[S.settings.activeMember]);
+    }
   }
 }
 
@@ -687,6 +738,11 @@ function onWeekChange() {
   saveState();
   renderCurrentSection();
   updateCountdown();
+  if (SheetSync.getUrl() && S.settings.autoSync) {
+    SheetSync.pullWeek(S.currentWeek).then(function(ok) {
+      if (ok) renderCurrentSection();
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1754,6 +1810,47 @@ function renderSettingsFull() {
       </div>
     </div>
 
+    <div class="card" style="border-color:var(--green)">
+      <div class="card-title text-green">&#9729; Google Sheet Sync</div>
+      <div class="card-sub">Connect to the shared Google Sheet so all members stay in sync</div>
+
+      <div class="alert alert-gold mt-8">
+        <span>&#9733;</span>
+        <div>
+          <strong>Setup Steps:</strong><br>
+          1. Open <a href="https://script.google.com" target="_blank" style="color:var(--gold);text-decoration:underline">script.google.com</a> and create a new project<br>
+          2. Paste the <code>Code.gs</code> file from the <code>apps-script/</code> folder<br>
+          3. Deploy &rarr; New deployment &rarr; Web app<br>
+          4. Execute as: <strong>Me</strong> | Who has access: <strong>Anyone</strong><br>
+          5. Copy the deployment URL and paste it below
+        </div>
+      </div>
+
+      <div class="form-row mt-16">
+        <div class="form-group" style="flex:1">
+          <label>Apps Script Web App URL</label>
+          <input type="text" id="setAppsScriptUrl" value="${esc(s.appsScriptUrl || '')}" onchange="s_updateAppsScriptUrl(this.value)" placeholder="https://script.google.com/macros/s/.../exec" style="font-family:monospace;font-size:12px">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label style="display:inline;margin:0">
+            <input type="checkbox" ${s.autoSync ? 'checked' : ''} onchange="s_toggleAutoSync(this.checked)">
+            Auto-sync on page load and pick changes
+          </label>
+        </div>
+      </div>
+
+      <div class="btn-group mt-8">
+        <button class="btn btn-green btn-sm" onclick="s_testSheetConnection()">&#9889; Test Connection</button>
+        <button class="btn btn-outline btn-sm" onclick="s_pullAllFromSheet()">&#8681; Pull All Data from Sheet</button>
+        <button class="btn btn-outline btn-sm" onclick="s_pushCurrentWeek()">&#8679; Push Current Week to Sheet</button>
+      </div>
+
+      ${s.appsScriptUrl ? '<div class="alert alert-success mt-8"><span>&#9989;</span> Sync URL configured. The sync indicator in the header shows connection status.</div>' : '<div class="alert alert-info mt-8"><span>&#9432;</span> No sync URL set. The app works fully offline — data is saved in your browser.</div>'}
+    </div>
+
     <div class="card">
       <div class="card-title">Members</div>
       <div class="card-sub">Edit the 5 syndicate member names</div>
@@ -1911,6 +2008,39 @@ function s_toggleOverride(v) {
   saveState(); updateCountdown(); renderSettings();
 }
 
+function s_updateAppsScriptUrl(v) {
+  S.settings.appsScriptUrl = v.trim();
+  saveState();
+  SheetSync.initIndicator();
+  toast(v.trim() ? 'Sync URL saved' : 'Sync URL cleared', 'success');
+  renderSettings();
+}
+function s_toggleAutoSync(v) { S.settings.autoSync = v; saveState(); }
+async function s_testSheetConnection() { await SheetSync.testConnection(); }
+async function s_pullAllFromSheet() {
+  if (!SheetSync.getUrl()) { toast('Set the Apps Script URL first', 'warn'); return; }
+  toast('Pulling all week data from Google Sheet...', 'info');
+  const ok = await SheetSync.pullAllWeeks();
+  if (ok) { renderCurrentSection(); toast('All data synced from sheet', 'success'); }
+}
+async function s_pushCurrentWeek() {
+  if (!SheetSync.getUrl()) { toast('Set the Apps Script URL first', 'warn'); return; }
+  const wk = ensureWeek(S.currentWeek);
+  const allPicks = {};
+  S.settings.members.forEach(function(m) { allPicks[m] = wk.picks[m] || [null,null,null,null,null]; });
+  SheetSync.updateIndicator('syncing', 'Pushing...');
+  try {
+    const result = await SheetSync.apiPost({ action: 'saveAllPicks', week: S.currentWeek, allPicks: allPicks });
+    if (result && result.success) {
+      SheetSync.updateIndicator('connected', 'Pushed');
+      toast('Week ' + S.currentWeek + ' pushed to Google Sheet', 'success');
+    } else { throw new Error((result && result.error) || 'Push failed'); }
+  } catch (err) {
+    SheetSync.updateIndicator('error', 'Push failed');
+    toast('Push failed: ' + err.message, 'error');
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    SECTION 16: RENDER — WEEKLY PICKS (member tabs)
    ═══════════════════════════════════════════════════════════ */
@@ -1936,7 +2066,13 @@ function renderPicksFull() {
   const members = S.settings.members;
   const editable = isWeekEditable(S.currentWeek);
 
-  if (!picksActiveMember || !members.includes(picksActiveMember)) picksActiveMember = null;
+  if (!picksActiveMember || !members.includes(picksActiveMember)) {
+    if (S.settings.activeMember && members.includes(S.settings.activeMember)) {
+      picksActiveMember = S.settings.activeMember;
+    } else {
+      picksActiveMember = null;
+    }
+  }
 
   // If no member selected, show the selection screen
   if (!picksActiveMember) {
@@ -2125,7 +2261,7 @@ function onPickChange(memberIdx, slot, newVal) {
     wk.overrides.push({ time: new Date().toISOString(), action: member + ' Pick ' + (slot+1) + ' changed' });
   }
 
-  saveState();
+  saveAndSync();
   renderPicksFull();
 }
 
@@ -3149,7 +3285,244 @@ async function clearLines() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   SECTION 23: INITIALIZATION
+   SECTION 23: GOOGLE SHEETS SYNC
+   ═══════════════════════════════════════════════════════════ */
+const SheetSync = {
+  syncing: false,
+  lastSync: null,
+  connected: false,
+
+  getUrl() {
+    return (S.settings.appsScriptUrl || '').trim();
+  },
+
+  updateIndicator(state, label) {
+    const el = document.getElementById('syncIndicator');
+    if (!el) return;
+    el.className = 'badge ' + ({
+      connected: 'sync-connected',
+      syncing: 'sync-syncing badge-pending',
+      error: 'sync-error',
+      offline: 'sync-offline'
+    }[state] || 'badge-pending');
+    el.textContent = (state === 'syncing' ? '↻ ' : '● ') + label;
+  },
+
+  async apiGet(action, params) {
+    const url = this.getUrl();
+    if (!url) return null;
+    const qs = new URLSearchParams({ action, ...params }).toString();
+    const res = await fetch(url + '?' + qs, { redirect: 'follow' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  },
+
+  async apiPost(data) {
+    const url = this.getUrl();
+    if (!url) return null;
+    const res = await fetch(url, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  },
+
+  async testConnection() {
+    try {
+      this.updateIndicator('syncing', 'Testing...');
+      const result = await this.apiGet('ping', {});
+      if (result && result.ok) {
+        this.connected = true;
+        this.updateIndicator('connected', 'Connected');
+        toast('Connected to Google Sheet', 'success');
+        return true;
+      }
+      throw new Error(result.error || 'Unknown error');
+    } catch (err) {
+      this.connected = false;
+      this.updateIndicator('error', 'Error');
+      toast('Connection failed: ' + err.message, 'error');
+      return false;
+    }
+  },
+
+  async pullWeek(weekNum) {
+    if (!this.getUrl()) return false;
+    try {
+      this.updateIndicator('syncing', 'Pulling W' + weekNum + '...');
+      const data = await this.apiGet('getWeekPicks', { week: weekNum });
+      if (data && data.picks && !data.error) {
+        const wk = ensureWeek(weekNum);
+        const members = S.settings.members;
+        members.forEach(function(m) {
+          if (data.picks[m]) {
+            wk.picks[m] = data.picks[m].map(function(v) { return v || null; });
+          }
+        });
+        saveStateLocal();
+        this.updateIndicator('connected', 'Synced');
+        return true;
+      }
+      if (data && data.error) throw new Error(data.error);
+      return false;
+    } catch (err) {
+      this.updateIndicator('error', 'Pull failed');
+      console.error('Sync pull error:', err);
+      return false;
+    }
+  },
+
+  async pullAllWeeks() {
+    if (!this.getUrl()) return false;
+    try {
+      this.syncing = true;
+      this.updateIndicator('syncing', 'Pulling all...');
+      const data = await this.apiGet('getAllWeeks', {});
+      if (data && data.weeks && !data.error) {
+        for (var wStr in data.weeks) {
+          var weekNum = parseInt(wStr);
+          var weekData = data.weeks[wStr];
+          if (weekData.picks) {
+            var wk = ensureWeek(weekNum);
+            S.settings.members.forEach(function(m) {
+              if (weekData.picks[m]) {
+                wk.picks[m] = weekData.picks[m].map(function(v) { return v || null; });
+              }
+            });
+          }
+        }
+        saveStateLocal();
+        this.lastSync = new Date().toISOString();
+        this.connected = true;
+        this.syncing = false;
+        this.updateIndicator('connected', 'Synced');
+        logActivity('Synced all weeks from Google Sheet');
+        return true;
+      }
+      throw new Error((data && data.error) || 'No data');
+    } catch (err) {
+      this.syncing = false;
+      this.updateIndicator('error', 'Sync failed');
+      toast('Full sync failed: ' + err.message, 'error');
+      return false;
+    }
+  },
+
+  async pushPicks(weekNum, member, picks) {
+    if (!this.getUrl()) return false;
+    try {
+      this.updateIndicator('syncing', 'Saving...');
+      const result = await this.apiPost({
+        action: 'savePicks',
+        week: weekNum,
+        member: member,
+        picks: picks
+      });
+      if (result && result.success) {
+        this.updateIndicator('connected', 'Saved');
+        return true;
+      }
+      throw new Error((result && result.error) || 'Save failed');
+    } catch (err) {
+      this.updateIndicator('error', 'Save failed');
+      toast('Sheet sync failed: ' + err.message, 'error');
+      return false;
+    }
+  },
+
+  async pullDashboard() {
+    if (!this.getUrl()) return null;
+    try {
+      return await this.apiGet('getDashboard', {});
+    } catch (err) {
+      console.error('Dashboard pull error:', err);
+      return null;
+    }
+  },
+
+  initIndicator() {
+    if (this.getUrl()) {
+      this.updateIndicator('offline', 'Ready');
+    } else {
+      this.updateIndicator('offline', 'No Sync');
+    }
+  }
+};
+
+function saveStateLocal() {
+  try {
+    const wk = S.weeks[S.currentWeek];
+    if (wk) wk.lastSaved = new Date().toISOString();
+    store.setItem(STORAGE_KEY, JSON.stringify(S));
+  } catch(e) {}
+}
+
+async function manualSync() {
+  if (!SheetSync.getUrl()) {
+    toast('Set up Google Sheet sync in Settings first', 'warn');
+    showSection('settings');
+    return;
+  }
+  const ok = await SheetSync.pullWeek(S.currentWeek);
+  if (ok) {
+    renderCurrentSection();
+    toast('Week ' + S.currentWeek + ' synced from Google Sheet', 'success');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 24: MEMBER IDENTITY & SETUP
+   ═══════════════════════════════════════════════════════════ */
+function showSetupOverlay() {
+  const overlay = document.getElementById('setupOverlay');
+  const list = document.getElementById('setupMemberList');
+  if (!overlay || !list) return;
+
+  let html = '';
+  S.settings.members.forEach(function(m, i) {
+    html += '<button class="member-select-btn" onclick="selectMember(\'' + m.replace(/'/g, "\\'") + '\')">'
+      + '<span class="member-dot" style="background:' + getMemberColor(i) + '">' + esc(m.charAt(0)) + '</span> '
+      + esc(m) + '</button>';
+  });
+  list.innerHTML = html;
+  overlay.style.display = 'flex';
+}
+
+function selectMember(name) {
+  S.settings.activeMember = name;
+  saveStateLocal();
+  document.getElementById('setupOverlay').style.display = 'none';
+  updateMemberBanner();
+
+  if (SheetSync.getUrl() && S.settings.autoSync) {
+    SheetSync.pullWeek(S.currentWeek).then(function(ok) {
+      if (ok) renderCurrentSection();
+    });
+  }
+}
+
+function switchMember() {
+  showSetupOverlay();
+}
+
+function updateMemberBanner() {
+  const banner = document.getElementById('memberBanner');
+  const nameEl = document.getElementById('memberBannerName');
+  if (!banner || !nameEl) return;
+
+  if (S.settings.activeMember) {
+    nameEl.textContent = S.settings.activeMember;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 25: INITIALIZATION
    ═══════════════════════════════════════════════════════════ */
 function init() {
   try {
@@ -3159,9 +3532,19 @@ function init() {
     updateCountdown();
     setInterval(updateCountdown, 1000);
     renderCurrentSection();
+    updateMemberBanner();
+    SheetSync.initIndicator();
+
+    if (!S.settings.activeMember) {
+      showSetupOverlay();
+    } else if (SheetSync.getUrl() && S.settings.autoSync) {
+      SheetSync.pullWeek(S.currentWeek).then(function(ok) {
+        if (ok) renderCurrentSection();
+      });
+    }
   } catch(err) {
     console.error('Init error:', err);
-    document.querySelector('.main-content').innerHTML = '<div style="background:var(--red-bg);border:1px solid var(--red);border-radius:8px;padding:20px;margin:20px;color:var(--red);font-size:15px"><strong>Error loading app:</strong> ' + err.message + '<br><br>Try clearing site data: Settings → Safari → Clear History and Website Data, then reopen this file.</div>';
+    document.querySelector('.main-content').innerHTML = '<div style="background:var(--red-bg);border:1px solid var(--red);border-radius:8px;padding:20px;margin:20px;color:var(--red);font-size:15px"><strong>Error loading app:</strong> ' + err.message + '<br><br>Try clearing site data or reload the page.</div>';
   }
 }
 
