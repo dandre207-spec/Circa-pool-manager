@@ -256,6 +256,8 @@ tr:hover td{background:var(--bg3)}
   .activity-time{min-width:auto;font-size:10px}
   .top5-grid{grid-template-columns:repeat(5,minmax(140px,1fr));min-width:max-content}
   .top5-card{min-width:140px}
+  .mobile-submit-bar{position:fixed;bottom:56px;left:0;right:0;z-index:90;padding:10px 16px calc(env(safe-area-inset-bottom,0) + 10px);background:var(--bg1);border-top:2px solid var(--gold);box-shadow:0 -4px 20px rgba(0,0,0,.5);display:flex;gap:8px;align-items:center}
+  .mobile-submit-bar .btn{flex:1;font-size:16px;padding:14px 20px;min-height:50px;justify-content:center}
 }
 @media(max-width:420px){
   .stat-grid{grid-template-columns:1fr 1fr}
@@ -785,6 +787,7 @@ function showSection(name) {
   const morePanel = document.getElementById('mobileMorePanel');
   if (morePanel) morePanel.classList.remove('open');
 
+  if (name !== 'picks') removeMobileSubmitBar();
   renderCurrentSection();
   const nav = document.getElementById('appNav');
   if (nav.classList.contains('open')) nav.classList.remove('open');
@@ -2697,6 +2700,35 @@ function renderPicksFull() {
   summary += '</div>';
 
   el.innerHTML = statusHtml + tabs + grid + summary;
+  updateMobileSubmitBar();
+}
+
+function removeMobileSubmitBar() {
+  var bar = document.getElementById('mobileSubmitBar');
+  if (bar) bar.remove();
+}
+
+function updateMobileSubmitBar() {
+  removeMobileSubmitBar();
+  if (window.innerWidth > 768) return;
+  if (!picksActiveMember) return;
+  var isOwn = S.settings.activeMember === picksActiveMember;
+  if (!isOwn) return;
+  var wk = S.weeks[S.currentWeek];
+  if (!wk) return;
+  var memberSubmitted = wk.submitted && wk.submitted[picksActiveMember];
+  var isSubmitted = memberSubmitted || wk.finalized === true;
+  if (isSubmitted) return;
+  var validation = validateMemberPicks(S.currentWeek, picksActiveMember);
+  var bar = document.createElement('div');
+  bar.id = 'mobileSubmitBar';
+  bar.className = 'mobile-submit-bar';
+  if (validation.complete) {
+    bar.innerHTML = '<button class="btn btn-gold" onclick="submitPicksUI()">&#9989; Submit Picks</button>';
+  } else {
+    bar.innerHTML = '<button class="btn btn-gold" disabled style="opacity:.5">Complete all 5 picks to submit (' + validation.filled + '/5)</button>';
+  }
+  document.body.appendChild(bar);
 }
 
 function switchPicksMember(name) {
