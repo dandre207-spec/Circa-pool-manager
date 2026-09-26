@@ -57,6 +57,12 @@ function doPost(e) {
       case 'savePicks':
         result = savePicks(data.week, data.member, data.picks);
         break;
+      case 'saveSubmission':
+        result = saveSubmission(data.week, data.member, data.time);
+        break;
+      case 'removeSubmission':
+        result = removeSubmission(data.week, data.member);
+        break;
       case 'saveResults':
         result = saveResults(data.week, data.results);
         break;
@@ -117,7 +123,8 @@ function getWeekPicks(weekNum) {
   if (!sheet) return { error: 'Sheet "Week ' + weekNum + '" not found' };
 
   const picks = {};
-  const range = sheet.getRange('A5:F9');
+  const submitted = {};
+  const range = sheet.getRange('A5:G9');
   const values = range.getValues();
 
   values.forEach(function(row) {
@@ -127,6 +134,10 @@ function getWeekPicks(weekNum) {
       for (var i = 1; i <= 5; i++) {
         var val = (row[i] || '').toString().trim();
         picks[member].push(teamNameToId(val));
+      }
+      var subTime = (row[6] || '').toString().trim();
+      if (subTime) {
+        submitted[member] = { time: subTime };
       }
     }
   });
@@ -146,6 +157,7 @@ function getWeekPicks(weekNum) {
   return {
     week: weekNum,
     picks: picks,
+    submitted: submitted,
     submissionPicks: submissionPicks,
     timestamp: new Date().toISOString()
   };
@@ -269,6 +281,52 @@ function saveAllPicks(weekNum, allPicks) {
     success: true,
     week: weekNum,
     savedMembers: saved,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function saveSubmission(weekNum, member, time) {
+  if (!member || MEMBERS.indexOf(member) === -1) {
+    return { error: 'Unknown member: ' + member };
+  }
+
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('Week ' + weekNum);
+  if (!sheet) return { error: 'Sheet "Week ' + weekNum + '" not found' };
+
+  var row = MEMBER_ROWS[member];
+  if (!row) return { error: 'No row mapping for member: ' + member };
+
+  sheet.getRange(row, 7).setValue(time || new Date().toISOString());
+  SpreadsheetApp.flush();
+
+  return {
+    success: true,
+    week: weekNum,
+    member: member,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function removeSubmission(weekNum, member) {
+  if (!member || MEMBERS.indexOf(member) === -1) {
+    return { error: 'Unknown member: ' + member };
+  }
+
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('Week ' + weekNum);
+  if (!sheet) return { error: 'Sheet "Week ' + weekNum + '" not found' };
+
+  var row = MEMBER_ROWS[member];
+  if (!row) return { error: 'No row mapping for member: ' + member };
+
+  sheet.getRange(row, 7).setValue('');
+  SpreadsheetApp.flush();
+
+  return {
+    success: true,
+    week: weekNum,
+    member: member,
     timestamp: new Date().toISOString()
   };
 }

@@ -2772,10 +2772,14 @@ async function submitPicksUI() {
   const pickLabels = picks.map(t => teamInfo(t).abbr + ' (' + spreadStr(getContestSpread(S.currentWeek, t)) + ')').join(', ');
   const ok = await showConfirm('Submit Picks', 'Submit your Week ' + S.currentWeek + ' picks?<br><br><strong>' + esc(pickLabels) + '</strong><br><br>Once submitted, picks are locked and visible to all members.');
   if (!ok) return;
-  wk.submitted[member] = { time: new Date().toISOString() };
+  const subTime = new Date().toISOString();
+  wk.submitted[member] = { time: subTime };
   logActivity(member + ' submitted picks for Week ' + S.currentWeek + ': ' + pickLabels);
-  toast(member + '\'s picks submitted for Week ' + S.currentWeek, 'success');
   saveAndSync();
+  if (SheetSync.getUrl()) {
+    await SheetSync.pushSubmission(S.currentWeek, member, subTime);
+  }
+  toast(member + '\'s picks submitted for Week ' + S.currentWeek, 'success');
   renderPicksFull();
 }
 
@@ -2788,8 +2792,11 @@ async function unsubmitPicksUI() {
   if (!ok) return;
   delete wk.submitted[member];
   logActivity('Commissioner unsubmitted ' + member + '\'s picks for Week ' + S.currentWeek);
-  toast(member + '\'s picks unsubmitted', 'info');
   saveState();
+  if (SheetSync.getUrl()) {
+    await SheetSync.removeSubmission(S.currentWeek, member);
+  }
+  toast(member + '\'s picks unsubmitted', 'info');
   renderPicksFull();
 }
 
@@ -3894,6 +3901,16 @@ const SheetSync = {
             wk.picks[m] = data.picks[m].map(function(v) { return v || null; });
           }
         });
+        if (data.submitted) {
+          if (!wk.submitted) wk.submitted = {};
+          members.forEach(function(m) {
+            if (data.submitted[m]) {
+              wk.submitted[m] = data.submitted[m];
+            } else {
+              delete wk.submitted[m];
+            }
+          });
+        }
         saveStateLocal();
         this.updateIndicator('connected', 'Synced');
         return true;
@@ -3924,6 +3941,16 @@ const SheetSync = {
                 wk.picks[m] = weekData.picks[m].map(function(v) { return v || null; });
               }
             });
+            if (weekData.submitted) {
+              if (!wk.submitted) wk.submitted = {};
+              S.settings.members.forEach(function(m) {
+                if (weekData.submitted[m]) {
+                  wk.submitted[m] = weekData.submitted[m];
+                } else {
+                  delete wk.submitted[m];
+                }
+              });
+            }
           }
         }
         saveStateLocal();
@@ -3961,6 +3988,48 @@ const SheetSync = {
     } catch (err) {
       this.updateIndicator('error', 'Save failed');
       toast('Sheet sync failed: ' + err.message, 'error');
+      return false;
+    }
+  },
+
+  async pushSubmission(weekNum, member, time) {
+    if (!this.getUrl()) return false;
+    try {
+      this.updateIndicator('syncing', 'Submitting...');
+      const result = await this.apiPost({
+        action: 'saveSubmission',
+        week: weekNum,
+        member: member,
+        time: time
+      });
+      if (result && result.success) {
+        this.updateIndicator('connected', 'Submitted');
+        return true;
+      }
+      throw new Error((result && result.error) || 'Submit failed');
+    } catch (err) {
+      this.updateIndicator('error', 'Submit failed');
+      toast('Submission sync failed: ' + err.message, 'error');
+      return false;
+    }
+  },
+
+  async removeSubmission(weekNum, member) {
+    if (!this.getUrl()) return false;
+    try {
+      this.updateIndicator('syncing', 'Updating...');
+      const result = await this.apiPost({
+        action: 'removeSubmission',
+        week: weekNum,
+        member: member
+      });
+      if (result && result.success) {
+        this.updateIndicator('connected', 'Updated');
+        return true;
+      }
+      throw new Error((result && result.error) || 'Update failed');
+    } catch (err) {
+      this.updateIndicator('error', 'Update failed');
       return false;
     }
   },
