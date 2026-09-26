@@ -177,6 +177,32 @@ tr:hover td{background:var(--bg3)}
 
 .progress-ring{width:40px;height:40px}
 
+/* ═══ TEAM PICKER ═══ */
+.team-picker-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 0}
+.team-picker-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px;border:2px solid var(--border);border-radius:var(--radius);background:var(--bg3);cursor:pointer;transition:all .15s;min-height:60px}
+.team-picker-btn:hover{border-color:var(--gold);background:var(--gold-bg)}
+.team-picker-btn.selected{border-color:var(--gold);background:var(--gold-bg);box-shadow:0 0 0 2px var(--gold)}
+.team-picker-btn.disabled{opacity:.3;pointer-events:none}
+.team-picker-btn .tp-abbr{font-size:16px;font-weight:800;color:var(--text)}
+.team-picker-btn .tp-spread{font-size:11px;color:var(--gold);font-weight:600;margin-top:2px}
+.team-picker-btn .tp-name{font-size:9px;color:var(--text3);margin-top:1px}
+.team-picker-header{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:8px 0 4px;grid-column:1/-1;border-bottom:1px solid var(--border)}
+.pick-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 14px;border:2px dashed var(--border);border-radius:var(--radius);background:var(--bg3);cursor:pointer;transition:all .15s;min-height:48px;color:var(--text);font-size:15px}
+.pick-btn:hover{border-color:var(--gold)}
+.pick-btn.has-pick{border-style:solid;border-color:var(--gold2)}
+
+/* ═══ PICKS PROGRESS BAR ═══ */
+.picks-progress{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--bg3);border-radius:var(--radius);margin-bottom:12px}
+.picks-progress-bar{flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.picks-progress-fill{height:100%;background:var(--gold);border-radius:4px;transition:width .3s}
+.picks-progress-text{font-size:13px;font-weight:700;color:var(--text2);white-space:nowrap}
+
+/* ═══ DEADLINE BANNER ═══ */
+.deadline-banner{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:var(--radius);margin-bottom:12px;font-size:14px;font-weight:600}
+.deadline-banner.urgent{background:var(--red-bg);border:1px solid var(--red);color:var(--red)}
+.deadline-banner.warning{background:var(--orange-bg);border:1px solid var(--orange);color:var(--orange)}
+.deadline-banner.ok{background:var(--green-bg);border:1px solid var(--green);color:var(--green)}
+
 /* ═══ SYNC STATUS ═══ */
 .sync-connected{background:var(--green-bg);color:var(--green)}
 .sync-syncing{background:var(--blue-bg);color:var(--blue);animation:syncPulse 1s infinite}
@@ -289,7 +315,7 @@ tr:hover td{background:var(--bg3)}
     <span id="seasonBadge" class="badge badge-pending">2026</span>
     <select id="globalWeek" class="week-select" onchange="onWeekChange()"></select>
     <span id="deadlineCountdown" class="countdown countdown-open"></span>
-    <span id="syncIndicator" class="badge badge-pending" style="cursor:pointer;font-size:10px" onclick="manualSync()" title="Click to sync with Google Sheet">&#9679; Offline</span>
+    <button id="syncIndicator" class="badge badge-pending" style="cursor:pointer;font-size:11px;border:none;padding:4px 10px;min-height:32px" onclick="manualSync()" title="Tap to sync">&#8635; Sync</button>
     <button class="mobile-menu-btn" onclick="toggleMobileNav()">&#9776;</button>
   </div>
 </div>
@@ -486,7 +512,7 @@ function defaultSettings() {
     linesProviderLabel: '',
     oddsApiKey: '',
     diversification: { poolSize: 10, minConsensus: 3, maxExposure: 4 },
-    commissionerOverride: true,
+    commissionerOverride: false,
     theme: 'dark',
     appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxHDkvbK72dtGTJNU8Y9QBQRm8ew5RZQQBScTbTEZ7mzJR8I3wajpPvY_zh0N1X17af/exec',
     autoSync: true,
@@ -2485,23 +2511,78 @@ async function s_pushCurrentWeek() {
    ═══════════════════════════════════════════════════════════ */
 let picksActiveMember = null;
 
+let _pickerMemberIdx = null, _pickerSlot = null;
+
 function teamSelectHTML(memberIdx, slot, current, exclude, weekNum) {
-  const selId = 'pick-' + memberIdx + '-' + slot;
-  let html = '<select id="' + selId + '" onchange="onPickChange(' + memberIdx + ',' + slot + ',this.value)" style="min-width:150px;width:100%">';
-  html += '<option value="">— Select Team —</option>';
-  const wk = S.weeks[weekNum];
-  const contestTeamIds = wk && wk.contestLines ? Object.keys(wk.contestLines) : [];
-  const teamsToShow = contestTeamIds.length > 0
-    ? NFL_TEAMS.filter(t => contestTeamIds.includes(t.id) || t.id === current)
-    : NFL_TEAMS;
-  teamsToShow.forEach(t => {
-    const disabled = exclude.includes(t.id) && t.id !== current;
-    const spVal = getContestSpread(weekNum, t.id);
-    const spLabel = spVal != null ? ' (' + spreadStr(spVal) + ')' : '';
-    html += '<option value="' + t.id + '"' + (t.id === current ? ' selected' : '') + (disabled ? ' disabled' : '') + '>' + t.abbr + ' ' + t.name + spLabel + '</option>';
-  });
-  html += '</select>';
-  return html;
+  const spVal = current ? getContestSpread(weekNum, current) : null;
+  const spLabel = spVal != null ? ' <span class="text-gold fs-sm">(' + spreadStr(spVal) + ')</span>' : '';
+  const label = current ? '<strong>' + esc(teamInfo(current).abbr) + '</strong> ' + esc(teamInfo(current).name) + spLabel : '<span style="color:var(--text3)">Tap to select team</span>';
+  return '<div class="pick-btn' + (current ? ' has-pick' : '') + '" onclick="openTeamPicker(' + memberIdx + ',' + slot + ')" role="button" tabindex="0">' + label + '<span style="color:var(--text3);font-size:18px">&#9662;</span></div>';
+}
+
+function openTeamPicker(memberIdx, slot) {
+  _pickerMemberIdx = memberIdx;
+  _pickerSlot = slot;
+  var weekNum = S.currentWeek;
+  var member = S.settings.members[memberIdx];
+  var wk = ensureWeek(weekNum);
+  var memberPicks = wk.picks[member] || [null,null,null,null,null];
+  var current = memberPicks[slot];
+  var exclude = memberPicks.filter(function(p, i) { return p != null && i !== slot; });
+  var contestTeamIds = wk.contestLines ? Object.keys(wk.contestLines) : [];
+  var teamsToShow = contestTeamIds.length > 0 ? NFL_TEAMS.filter(function(t) { return contestTeamIds.includes(t.id) || t.id === current; }) : NFL_TEAMS;
+  var afcTeams = teamsToShow.filter(function(t) { return t.conf === 'AFC'; });
+  var nfcTeams = teamsToShow.filter(function(t) { return t.conf === 'NFC'; });
+
+  var html = '<div style="padding:4px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  html += '<div><div style="font-size:18px;font-weight:800">Pick ' + (slot + 1) + '</div><div style="font-size:13px;color:var(--gold);font-weight:700">' + WEIGHTS[slot] + ' points</div></div>';
+  html += '<button class="btn btn-outline btn-sm" onclick="closeGenericModal()" style="min-height:36px;padding:6px 12px">&#10005;</button></div>';
+  if (current) {
+    html += '<button class="btn btn-outline btn-sm" style="width:100%;margin-bottom:12px;color:var(--red);border-color:var(--red)" onclick="selectTeamFromPicker(\'\')">&#10005; Clear this pick</button>';
+  }
+
+  function renderGroup(label, teams) {
+    html += '<div class="team-picker-header">' + label + '</div>';
+    html += '<div class="team-picker-grid">';
+    teams.forEach(function(t) {
+      var isExcluded = exclude.includes(t.id);
+      var isCurrent = t.id === current;
+      var cls = 'team-picker-btn' + (isCurrent ? ' selected' : '') + (isExcluded ? ' disabled' : '');
+      var sp = getContestSpread(weekNum, t.id);
+      html += '<div class="' + cls + '" onclick="selectTeamFromPicker(\'' + t.id + '\')">';
+      html += '<span class="tp-abbr">' + t.abbr + '</span>';
+      if (sp != null) html += '<span class="tp-spread">' + spreadStr(sp) + '</span>';
+      html += '<span class="tp-name">' + t.name + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  renderGroup('AFC', afcTeams);
+  renderGroup('NFC', nfcTeams);
+  html += '</div>';
+  openGenericModal(html);
+}
+
+function selectTeamFromPicker(teamId) {
+  closeGenericModal();
+  if (_pickerMemberIdx == null || _pickerSlot == null) return;
+  onPickChange(_pickerMemberIdx, _pickerSlot, teamId);
+  if (teamId) {
+    var member = S.settings.members[_pickerMemberIdx];
+    var wk = ensureWeek(S.currentWeek);
+    var picks = wk.picks[member] || [];
+    var nextEmpty = -1;
+    for (var i = 0; i < 5; i++) { if (!picks[i] && i !== _pickerSlot) { nextEmpty = i; break; } }
+    if (nextEmpty >= 0) {
+      setTimeout(function() {
+        var card = document.getElementById('pickCard-' + nextEmpty);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 200);
+    }
+  }
+  _pickerMemberIdx = null;
+  _pickerSlot = null;
 }
 
 function renderPicksFull() {
@@ -2546,6 +2627,10 @@ function renderPicksFull() {
           }).join('')}
         </div>
       </div>
+      <div class="card" style="margin-top:12px;text-align:center">
+        <button class="btn btn-outline" style="width:100%" onclick="sharePoolLink()">&#128279; Share Pool Link with Members</button>
+        <div id="lastSyncTime" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
+      </div>
     `;
     return;
   }
@@ -2572,18 +2657,35 @@ function renderPicksFull() {
     statusHtml = '<div class="override-banner">&#9888; Commissioner Override active — editing unlocked</div>';
   }
 
+  // Deadline banner
+  let deadlineBanner = '';
+  var dlDate = getDeadlineDate(S.currentWeek);
+  var dlDiff = dlDate - new Date();
+  if (dlDiff > 0 && !wk.finalized) {
+    var dlHrs = Math.floor(dlDiff / 3600000);
+    var dlMins = Math.floor((dlDiff % 3600000) / 60000);
+    var dlClass = dlDiff < 3600000 ? 'urgent' : dlDiff < 86400000 ? 'warning' : 'ok';
+    var dlText = dlHrs > 0 ? dlHrs + 'h ' + dlMins + 'm until picks lock' : dlMins + 'm until picks lock';
+    deadlineBanner = '<div class="deadline-banner ' + dlClass + '">&#9200; ' + dlText + '</div>';
+  }
+
   // Pick grid for active member
   const memberPicks = wk.picks[picksActiveMember] || [null,null,null,null,null];
   const exclude = memberPicks.filter(p => p != null);
   const validation = validateMemberPicks(S.currentWeek, picksActiveMember);
   const note = wk.notes[picksActiveMember] || '';
 
+  // Progress bar
+  let progressBar = '<div class="picks-progress"><div class="picks-progress-text">' + validation.filled + '/5</div><div class="picks-progress-bar"><div class="picks-progress-fill" style="width:' + (validation.filled * 20) + '%"></div></div>';
+  if (validation.complete) progressBar += '<span style="font-size:13px">&#9989;</span>';
+  progressBar += '</div>';
+
   const memberIdx = S.settings.members.indexOf(picksActiveMember);
   const isOwnPicks = S.settings.activeMember === picksActiveMember;
   const memberSubmitted = wk.submitted && wk.submitted[picksActiveMember];
   const isSubmitted = memberSubmitted || wk.finalized === true;
   const canEdit = isOwnPicks && !isSubmitted;
-  let grid = '<div class="card">';
+  let grid = deadlineBanner + progressBar + '<div class="card">';
   grid += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="card-title">' + memberDot(picksActiveMember) + ' ' + esc(picksActiveMember) + '\'s Picks</div>';
   grid += '<span class="badge badge-' + (validation.complete ? 'win' : 'pending') + '">' + (validation.complete ? 'Complete' : validation.filled + '/5') + '</span></div>';
 
@@ -2600,7 +2702,7 @@ function renderPicksFull() {
   }
 
   // Desktop table
-  grid += '<div class="desktop-table"><table><thead><tr><th>Rank</th><th>Weight</th><th>Team Selection</th><th>Spread</th>' + (canEdit ? '<th></th>' : '') + '</tr></thead><tbody>';
+  grid += '<div class="desktop-table"><table><thead><tr><th>Rank</th><th>Weight</th><th>Team Selection</th><th>Spread</th></tr></thead><tbody>';
   for (let slot = 0; slot < 5; slot++) {
     const current = memberPicks[slot];
     const sp = current ? getSpread(S.currentWeek, current) : null;
@@ -2610,7 +2712,6 @@ function renderPicksFull() {
     grid += '<td><span class="pick-weight">' + WEIGHTS[slot] + ' pts</span></td>';
     grid += '<td>' + (canEdit ? teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) : '<span class="fw-700">' + (current ? esc(teamLabel(current)) + (sp != null ? ' <span class="text-gold fs-sm">(' + spreadStr(sp) + ')</span>' : '') : '—') + '</span>') + (isDup ? ' <span class="tie-indicator">DUPLICATE</span>' : '') + '</td>';
     grid += '<td class="text-gold">' + spreadStr(sp) + '</td>';
-    if (canEdit) grid += '<td>' + (current ? '<button class="btn btn-outline btn-sm" style="padding:2px 8px;min-height:auto;color:var(--red);border-color:var(--red)" onclick="clearSinglePick(' + memberIdx + ',' + slot + ')" title="Clear this pick">&#10005;</button>' : '') + '</td>';
     grid += '</tr>';
   }
   grid += '</tbody></table></div>';
@@ -2619,19 +2720,17 @@ function renderPicksFull() {
   grid += '<div class="game-cards">';
   for (let slot = 0; slot < 5; slot++) {
     const current = memberPicks[slot];
+    const cardId = 'pickCard-' + slot;
     const sp = current ? getSpread(S.currentWeek, current) : null;
     const isDup = current && memberPicks.filter(p => p === current).length > 1;
     const weightColors = ['var(--gold)','var(--gold)','var(--blue)','var(--text2)','var(--text3)'];
-    grid += '<div style="background:var(--bg3);border:1px solid ' + (isDup ? 'var(--red)' : 'var(--border)') + ';border-radius:var(--radius);padding:12px;margin-bottom:8px">';
+    grid += '<div id="' + cardId + '" style="background:var(--bg3);border:1px solid ' + (isDup ? 'var(--red)' : 'var(--border)') + ';border-radius:var(--radius);padding:12px;margin-bottom:8px">';
     grid += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
     grid += '<span class="fw-700" style="font-size:15px">Pick ' + (slot + 1) + '</span>';
     grid += '<span style="background:' + weightColors[slot] + ';color:#000;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:700">' + WEIGHTS[slot] + ' pts</span>';
     grid += '</div>';
     if (canEdit) {
-      grid += '<div style="display:flex;gap:8px;align-items:center">';
       grid += '<div style="flex:1">' + teamSelectHTML(memberIdx, slot, current, exclude.filter(e => e !== current), S.currentWeek) + '</div>';
-      if (current) grid += '<button class="btn btn-outline btn-sm" style="padding:6px 10px;min-height:auto;color:var(--red);border-color:var(--red);flex-shrink:0" onclick="clearSinglePick(' + memberIdx + ',' + slot + ')" title="Clear this pick">&#10005;</button>';
-      grid += '</div>';
     } else {
       grid += '<div class="fw-700" style="font-size:16px;padding:8px 0">' + (current ? esc(teamLabel(current)) + (sp != null ? ' <span class="text-gold" style="font-size:13px">(' + spreadStr(sp) + ')</span>' : '') : '<span class="text-dim">No pick</span>') + '</div>';
     }
@@ -4112,6 +4211,76 @@ async function manualSync() {
   }
 }
 
+let _syncInterval = null;
+let _lastSyncTime = 0;
+const SYNC_INTERVAL_MS = 30000;
+
+function startAutoSync() {
+  if (_syncInterval) return;
+  _syncInterval = setInterval(autoSyncPull, SYNC_INTERVAL_MS);
+  document.addEventListener('visibilitychange', onVisibilitySync);
+}
+
+function onVisibilitySync() {
+  if (document.visibilityState === 'visible' && Date.now() - _lastSyncTime > 10000) {
+    autoSyncPull();
+  }
+}
+
+async function autoSyncPull() {
+  if (!SheetSync.getUrl() || SheetSync.syncing) return;
+  _lastSyncTime = Date.now();
+  var activeMember = S.settings.activeMember;
+  var wk = S.weeks[S.currentWeek];
+  var localPicks = null;
+  var localSubmitted = null;
+  if (activeMember && wk && wk.picks[activeMember]) {
+    var isLocalSubmitted = wk.submitted && wk.submitted[activeMember];
+    if (!isLocalSubmitted) {
+      localPicks = (wk.picks[activeMember] || []).slice();
+    }
+  }
+  var oldSubmitted = {};
+  if (wk && wk.submitted) {
+    S.settings.members.forEach(function(m) { if (wk.submitted[m]) oldSubmitted[m] = true; });
+  }
+  var ok = await SheetSync.pullWeek(S.currentWeek);
+  if (!ok) return;
+  var newWk = S.weeks[S.currentWeek];
+  if (localPicks && activeMember && newWk) {
+    var remoteSubmitted = newWk.submitted && newWk.submitted[activeMember];
+    if (!remoteSubmitted) {
+      newWk.picks[activeMember] = localPicks;
+      saveStateLocal();
+    }
+  }
+  if (newWk && newWk.submitted) {
+    S.settings.members.forEach(function(m) {
+      if (newWk.submitted[m] && !oldSubmitted[m] && m !== activeMember) {
+        toast(m + ' just submitted their picks!', 'success');
+      }
+    });
+  }
+  renderCurrentSection();
+  updateLastSyncDisplay();
+}
+
+function updateLastSyncDisplay() {
+  var el = document.getElementById('lastSyncTime');
+  if (el) el.textContent = 'Synced ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function sharePoolLink() {
+  var url = window.location.origin + window.location.pathname;
+  if (navigator.share) {
+    navigator.share({ title: 'Circa Pool Manager — Week ' + S.currentWeek, text: 'Make your Week ' + S.currentWeek + ' picks!', url: url });
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() { toast('Link copied to clipboard!', 'success'); });
+  } else {
+    prompt('Copy this link:', url);
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    SECTION 24: MEMBER IDENTITY & SETUP
    ═══════════════════════════════════════════════════════════ */
@@ -4261,6 +4430,16 @@ function init() {
       SheetSync.pullWeek(S.currentWeek).then(function(ok) {
         if (ok) renderCurrentSection();
       });
+    }
+
+    if (SheetSync.getUrl()) startAutoSync();
+
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('member') && S.settings.members.includes(params.get('member'))) {
+      S.settings.activeMember = params.get('member');
+      document.getElementById('setupOverlay').style.display = 'none';
+      updateMemberBanner();
+      saveStateLocal();
     }
   } catch(err) {
     console.error('Init error:', err);
