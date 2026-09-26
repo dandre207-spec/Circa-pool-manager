@@ -113,6 +113,10 @@ tr:hover td{background:var(--bg3)}
 
 .top5-highlight{background:var(--gold-bg) !important}
 .tie-indicator{color:var(--orange);font-weight:700;font-size:11px}
+.top5-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -4px;padding:0 4px}
+.top5-scroll::-webkit-scrollbar{display:none}
+.top5-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;min-width:0}
+.top5-card{background:var(--bg2);border:1px solid var(--gold2);border-radius:var(--radius);padding:16px 12px;text-align:center;min-width:0}
 .member-dot{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:10px;font-weight:700;line-height:22px;text-align:center;color:#000;margin-right:3px}
 
 .entry-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
@@ -250,6 +254,8 @@ tr:hover td{background:var(--bg3)}
   .card-sub{font-size:11px}
   .activity-item{flex-direction:column;gap:2px}
   .activity-time{min-width:auto;font-size:10px}
+  .top5-grid{grid-template-columns:repeat(5,minmax(140px,1fr));min-width:max-content}
+  .top5-card{min-width:140px}
 }
 @media(max-width:420px){
   .stat-grid{grid-template-columns:1fr 1fr}
@@ -2829,22 +2835,22 @@ function renderTallyFull() {
   // Top 5 highlight
   html += '<div class="card" style="border-color:var(--gold2);background:var(--gold-bg)">';
   html += '<div class="card-title text-gold">&#127942; Top 5 Consensus Picks</div>';
-  html += '<div class="card-sub" style="margin-bottom:10px">These are the group\'s strongest plays by weighted score</div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">';
+  html += '<div class="card-sub" style="margin-bottom:12px">These are the group\'s strongest plays by weighted score</div>';
+  html += '<div class="top5-scroll"><div class="top5-grid">';
   tally.slice(0, 5).forEach((t, i) => {
-    const sp = getContestSpread(S.currentWeek, t.teamId);
-    html += '<div style="background:var(--bg2);border:1px solid var(--gold2);border-radius:var(--radius);padding:12px;text-align:center">';
+    const tie = i > 0 && hasTie(tally, i);
+    html += '<div class="top5-card">';
     html += '<div class="fs-xs text-dim">#' + (i+1) + '</div>';
-    html += '<div class="fw-700" style="font-size:18px">' + esc(teamInfo(t.teamId).abbr) + '</div>';
-    html += '<div class="fs-xs">' + esc(teamInfo(t.teamId).name) + '</div>';
-    html += '<div class="text-gold fw-700" style="font-size:14px">' + spreadStr(sp) + '</div>';
-    html += '<div style="font-size:20px;font-weight:800;color:var(--gold);margin:4px 0">' + t.score + ' pts</div>';
+    html += '<div style="font-size:22px;font-weight:800;margin:4px 0">' + esc(teamInfo(t.teamId).abbr) + '</div>';
+    html += '<div class="fs-xs" style="color:var(--text2)">' + esc(teamInfo(t.teamId).name) + '</div>';
+    html += '<div style="width:30px;height:2px;background:var(--gold);margin:10px auto"></div>';
+    html += '<div style="font-size:22px;font-weight:800;color:var(--gold);margin:6px 0">' + t.score + ' pts</div>';
     html += '<div class="fs-xs text-dim">' + t.memberCount + '/5 members</div>';
-    html += '<div class="fs-xs text-dim">' + Object.keys(t.supporters).map(m => esc(m)).join(', ') + '</div>';
-    if (i > 0 && hasTie(tally, i)) html += '<div class="tie-indicator" style="margin-top:4px">TIE</div>';
+    html += '<div class="fs-xs text-dim" style="margin-top:2px">' + Object.keys(t.supporters).map(m => esc(m)).join(', ') + '</div>';
+    if (tie) html += '<div class="tie-indicator" style="margin-top:6px">TIE</div>';
     html += '</div>';
   });
-  html += '</div></div>';
+  html += '</div></div></div>';
 
   if (effectiveView === 'table') {
     html += '<div class="card"><div class="table-wrap"><table>';
