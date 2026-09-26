@@ -296,6 +296,7 @@ tr:hover td{background:var(--bg3)}
   <button class="nav-btn" data-sec="season" onclick="showSection('season')">&#128200; Season Summary</button>
   <button class="nav-btn" data-sec="frequency" onclick="showSection('frequency')">&#128202; Team Frequency</button>
   <button class="nav-btn" data-sec="lines" onclick="showSection('lines')">&#128178; Lines &amp; Spreads</button>
+  <button class="nav-btn" data-sec="admin" onclick="showSection('admin')">&#128274; Admin</button>
   <button class="nav-btn" data-sec="instructions" onclick="showSection('instructions')">&#128214; Instructions</button>
   <button class="nav-btn" data-sec="settings" onclick="showSection('settings')">&#9881; Settings</button>
 </nav>
@@ -358,6 +359,9 @@ tr:hover td{background:var(--bg3)}
   <!-- INSTRUCTIONS -->
   <div class="section" id="sec-instructions"></div>
 
+  <!-- ADMIN -->
+  <div class="section" id="sec-admin"></div>
+
   <!-- SETTINGS -->
   <div class="section" id="sec-settings"></div>
 
@@ -378,6 +382,7 @@ tr:hover td{background:var(--bg3)}
   <button class="mob-more-btn" data-sec="results" onclick="showSection('results')">&#9989; Results</button>
   <button class="mob-more-btn" data-sec="season" onclick="showSection('season')">&#128200; Season</button>
   <button class="mob-more-btn" data-sec="frequency" onclick="showSection('frequency')">&#128202; Frequency</button>
+  <button class="mob-more-btn" data-sec="admin" onclick="showSection('admin')">&#128274; Admin</button>
   <button class="mob-more-btn" data-sec="instructions" onclick="showSection('instructions')">&#128214; Help</button>
   <button class="mob-more-btn" data-sec="settings" onclick="showSection('settings')">&#9881; Settings</button>
 </div>
@@ -487,6 +492,7 @@ function defaultWeek() {
     notes: {},
     lines: {},
     contestLines: {},
+    submitted: {},
     entries: [
       {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false},
       {picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false},
@@ -526,6 +532,7 @@ function ensureWeek(w) {
     for (let i = 0; i < 5; i++) wk.entries.push({picks:[null,null,null,null,null],status:'draft',notes:'',manuallyEdited:false});
   }
   if (!wk.contestLines) wk.contestLines = {};
+  if (!wk.submitted) wk.submitted = {};
   return wk;
 }
 
@@ -794,6 +801,7 @@ function renderCurrentSection() {
     case 'frequency': renderFrequency(); break;
     case 'lines': renderLines(); break;
     case 'instructions': renderInstructions(); break;
+    case 'admin': renderAdmin(); break;
     case 'settings': renderSettings(); break;
   }
 }
@@ -1383,7 +1391,187 @@ async function fetchESPNLinesForWeek(weekNum) {
   }
 }
 
-/* Contest lines — these are entered manually from Circa and never change once saved */
+/* ── Circa Contest Lines — bulk parser and importer ── */
+
+const CIRCA_TEAM_ALIASES = {};
+NFL_TEAMS.forEach(t => {
+  CIRCA_TEAM_ALIASES[t.id.toLowerCase()] = t.id;
+  CIRCA_TEAM_ALIASES[t.abbr.toLowerCase()] = t.id;
+  CIRCA_TEAM_ALIASES[t.name.toLowerCase()] = t.id;
+  CIRCA_TEAM_ALIASES[t.full.toLowerCase()] = t.id;
+});
+CIRCA_TEAM_ALIASES['washington'] = 'WAS';
+CIRCA_TEAM_ALIASES['niners'] = 'SF';
+CIRCA_TEAM_ALIASES['nfl'] = null;
+CIRCA_TEAM_ALIASES['week'] = null;
+CIRCA_TEAM_ALIASES['circa'] = null;
+
+function resolveTeamAlias(text) {
+  const t = text.trim().toLowerCase().replace(/[^a-z0-9' ]/g, '');
+  if (CIRCA_TEAM_ALIASES[t] !== undefined) return CIRCA_TEAM_ALIASES[t];
+  for (const [alias, id] of Object.entries(CIRCA_TEAM_ALIASES)) {
+    if (id && alias.includes(t) && t.length >= 3) return id;
+  }
+  return null;
+}
+
+const CIRCA_EDITION = 'VIII';
+
+function getCircaPDFUrl(weekNum, monthOverride) {
+  const season = S.settings.season;
+  // NFL Week 1 Thursday is typically the 2nd Thursday of September
+  // Calculate approximate month: Weeks 1-4 → Sep, 5-8 → Oct, 9-13 → Nov, 14-17 → Dec, 18 → Jan
+  let month;
+  if (monthOverride) {
+    month = monthOverride;
+  } else if (weekNum <= 4) {
+    month = 9;
+  } else if (weekNum <= 9) {
+    month = 10;
+  } else if (weekNum <= 13) {
+    month = 11;
+  } else if (weekNum <= 17) {
+    month = 12;
+  } else {
+    month = 1;
+  }
+  const mm = String(month).padStart(2, '0');
+  const yr = month === 1 ? season + 1 : season;
+  return 'https://www.circasports.com/wp-content/uploads/' + yr + '/' + mm +
+    '/Circa-Sports-Million-' + CIRCA_EDITION + '-Contest-Point-Spreads-Week-' + weekNum + '.pdf';
+}
+
+async function findCircaPDFUrl(weekNum) {
+  const primary = getCircaPDFUrl(weekNum);
+  try {
+    const res = await fetch(primary, { method: 'HEAD' });
+    if (res.ok) return primary;
+  } catch(e) {}
+  // Try adjacent months
+  const season = S.settings.season;
+  const baseMonth = weekNum <= 4 ? 9 : weekNum <= 9 ? 10 : weekNum <= 13 ? 11 : weekNum <= 17 ? 12 : 1;
+  for (const offset of [1, -1]) {
+    const alt = getCircaPDFUrl(weekNum, baseMonth + offset);
+    try {
+      const res = await fetch(alt, { method: 'HEAD' });
+      if (res.ok) return alt;
+    } catch(e) {}
+  }
+  return primary;
+}
+
+function parseCircaContestText(text) {
+  const results = [];
+  const lines = text.split(/[\n;]+/).map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    const parts = line.split(/,/).map(s => s.trim()).filter(Boolean);
+    for (const part of parts) {
+      const m = part.match(/^(.+?)\s+([+-]?\d+\.?\d*)\s*$/);
+      if (!m) continue;
+      const teamText = m[1].replace(/[()]/g, '').trim();
+      const spread = parseFloat(m[2]);
+      if (isNaN(spread)) continue;
+      const teamId = resolveTeamAlias(teamText);
+      if (teamId) results.push({ teamId, spread });
+    }
+  }
+  return results;
+}
+
+function bulkImportCircaContestLines(weekNum, text) {
+  const parsed = parseCircaContestText(text);
+  if (parsed.length === 0) {
+    toast('Could not parse any lines. Use format: KC -6.5, PHI -7, SF -13', 'error');
+    return 0;
+  }
+  const wk = ensureWeek(weekNum);
+  if (!wk.contestLines) wk.contestLines = {};
+  let count = 0;
+  parsed.forEach(({ teamId, spread }) => {
+    wk.contestLines[teamId] = {
+      spread: spread,
+      lockedAt: new Date().toISOString(),
+      source: 'Circa Contest'
+    };
+    count++;
+  });
+  saveState();
+  toast(count + ' Circa contest lines locked for Week ' + weekNum, 'success');
+  logActivity('Bulk imported ' + count + ' Circa contest lines for Week ' + weekNum);
+  return count;
+}
+
+async function showCircaContestImport(prefill) {
+  const weekNum = S.currentWeek;
+  const wk = ensureWeek(weekNum);
+  const existingCount = Object.keys(wk.contestLines || {}).length;
+  const warning = existingCount > 0 ? '<div style="color:var(--orange);font-size:13px;margin-bottom:8px">&#9888; This will overwrite ' + existingCount + ' existing contest lines.</div>' : '';
+
+  let defaultText = prefill || '';
+  if (!defaultText) {
+    const entries = Object.entries(wk.lines || {}).filter(([, l]) => l.homeAway === 'home' && l.spread != null);
+    if (entries.length > 0) {
+      defaultText = entries.map(([tid, l]) => tid + ' ' + spreadStr(l.spread)).join('\n');
+    }
+  }
+
+  const pdfUrl = await findCircaPDFUrl(weekNum);
+
+  openGenericModal(
+    '<div class="modal-title" style="color:var(--gold)">&#127944; Import Circa Contest Lines — Week ' + weekNum + '</div>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+    '<div style="flex:1;min-width:280px">' +
+    '<div class="fs-sm text-dim mb-8">Paste the Circa Sports contest spreads below. Accepts formats like:<br>' +
+    '<code>KC -6.5, PHI -7, SF -13</code> or one per line:<br>' +
+    '<code>KC -6.5</code><br><code>Eagles -7</code><br><code>San Francisco -13</code></div>' +
+    warning +
+    '<textarea id="circaContestInput" rows="14" style="width:100%;font-family:monospace;font-size:14px" placeholder="KC -6.5&#10;PHI -7&#10;SF -13&#10;LAR -7&#10;...">' + esc(defaultText) + '</textarea>' +
+    '<div id="circaPreview" class="fs-sm" style="margin-top:8px"></div>' +
+    '</div>' +
+    '<div style="flex:1;min-width:280px">' +
+    '<div class="fs-sm fw-700 mb-8" style="color:var(--gold)">&#128196; Circa Contest PDF — Week ' + weekNum + '</div>' +
+    '<iframe src="' + esc(pdfUrl) + '" style="width:100%;height:400px;border:1px solid var(--border);border-radius:8px;background:#fff"></iframe>' +
+    '<div style="margin-top:6px"><a href="' + esc(pdfUrl) + '" target="_blank" class="fs-xs" style="color:var(--gold)">Open PDF in new tab &#8599;</a></div>' +
+    '</div>' +
+    '</div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-outline" onclick="closeGenericModal()">Cancel</button>' +
+    '<button class="btn btn-outline" onclick="previewCircaImport()">Preview</button>' +
+    '<button class="btn btn-gold" onclick="confirmCircaImport()">&#128274; Lock Contest Lines</button>' +
+    '</div>'
+  );
+
+  setTimeout(() => {
+    const ta = document.getElementById('circaContestInput');
+    if (ta) ta.addEventListener('input', previewCircaImport);
+    previewCircaImport();
+  }, 50);
+}
+
+function previewCircaImport() {
+  const ta = document.getElementById('circaContestInput');
+  const el = document.getElementById('circaPreview');
+  if (!ta || !el) return;
+  const parsed = parseCircaContestText(ta.value);
+  if (parsed.length === 0) {
+    el.innerHTML = '<span class="text-dim">No lines detected yet...</span>';
+    return;
+  }
+  el.innerHTML = '<span style="color:var(--green)">&#10003; ' + parsed.length + ' lines detected:</span> ' +
+    parsed.map(p => '<span class="fw-700">' + esc(p.teamId) + ' ' + spreadStr(p.spread) + '</span>').join(', ');
+}
+
+function confirmCircaImport() {
+  const ta = document.getElementById('circaContestInput');
+  if (!ta) return;
+  const count = bulkImportCircaContestLines(S.currentWeek, ta.value);
+  if (count > 0) {
+    closeGenericModal();
+    renderLinesFull();
+  }
+}
+
+/* Contest lines — locked Circa spreads */
 function setContestLine(weekNum, teamId, spread) {
   const wk = ensureWeek(weekNum);
   if (!wk.contestLines) wk.contestLines = {};
@@ -1599,6 +1787,137 @@ function renderSettings() { renderSettingsFull(); }
 /* ═══════════════════════════════════════════════════════════
    SECTION 13: RENDER — DASHBOARD
    ═══════════════════════════════════════════════════════════ */
+function buildRunningTallyHTML() {
+  const members = S.settings.members;
+  const scoring = S.settings.scoring;
+
+  // Find last week with any results
+  let lastResultsWeek = 0;
+  for (let w = 1; w <= TOTAL_WEEKS; w++) {
+    const wk = S.weeks[w];
+    if (wk && Object.values(wk.results || {}).some(r => r && r !== 'pending')) lastResultsWeek = w;
+  }
+  if (lastResultsWeek === 0) {
+    return '<div class="card"><div class="card-title">&#127942; Season Running Tally</div><div class="empty-state"><div class="empty-icon">&#128202;</div><p class="text-dim">No results entered yet. The running tally will appear after Week 1 results are in.</p></div></div>';
+  }
+
+  let html = '';
+
+  // ── DA COMMISH (Entry 1) Running Total ──
+  html += '<div class="card" style="border-color:var(--gold2)">';
+  html += '<div class="card-title" style="color:var(--gold)">&#127942; Da Commish — Season Running Total</div>';
+  html += '<div class="card-sub">Entry 1 (collective consensus picks) week-by-week performance</div>';
+  html += '<div class="table-wrap mt-8"><table><thead><tr>';
+  html += '<th>Week</th><th>Picks</th><th>W</th><th>L</th><th>P</th><th>Wk Pts</th><th style="color:var(--gold)">Running Total</th>';
+  html += '</tr></thead><tbody>';
+
+  let commishRunning = 0;
+  let commishW = 0, commishL = 0, commishP = 0;
+  for (let w = 1; w <= lastResultsWeek; w++) {
+    const r = getEntryWeeklyResults(w, 0);
+    const wk = S.weeks[w];
+    const entry = wk && wk.entries[0];
+    const picks = entry ? (entry.picks || []).filter(t => t) : [];
+    if (r.total === 0 && picks.length === 0) {
+      html += '<tr><td class="fw-700">Wk ' + w + '</td><td colspan="6" class="text-dim fs-sm">No data</td></tr>';
+      continue;
+    }
+    commishRunning += r.pts;
+    commishW += r.w; commishL += r.l; commishP += r.p;
+    const pickLabels = picks.map(t => teamInfo(t).abbr).join(', ');
+    const wkColor = r.pts >= 4 ? 'var(--green)' : r.pts >= 2.5 ? 'var(--gold)' : 'var(--red)';
+    html += '<tr>';
+    html += '<td class="fw-700">Wk ' + w + '</td>';
+    html += '<td class="fs-xs">' + esc(pickLabels) + '</td>';
+    html += '<td class="text-green fw-700">' + r.w + '</td>';
+    html += '<td class="text-red">' + r.l + '</td>';
+    html += '<td class="text-gold">' + r.p + '</td>';
+    html += '<td style="color:' + wkColor + '" class="fw-700">' + r.pts + '</td>';
+    html += '<td class="fw-700" style="color:var(--gold);font-size:16px">' + commishRunning + '</td>';
+    html += '</tr>';
+  }
+  html += '<tr style="border-top:2px solid var(--gold)">';
+  html += '<td class="fw-700">Total</td><td></td>';
+  html += '<td class="text-green fw-700">' + commishW + '</td>';
+  html += '<td class="text-red fw-700">' + commishL + '</td>';
+  html += '<td class="text-gold fw-700">' + commishP + '</td>';
+  html += '<td></td>';
+  html += '<td class="fw-700" style="color:var(--gold);font-size:18px">' + commishRunning + ' pts</td>';
+  html += '</tr>';
+  html += '</tbody></table></div></div>';
+
+  // ── INDIVIDUAL MEMBER Running Totals ──
+  html += '<div class="card">';
+  html += '<div class="card-title">&#128101; Individual Running Totals</div>';
+  html += '<div class="card-sub">Each member\'s personal picks performance (not the submitted entry)</div>';
+
+  // Summary bar — ranked by points
+  const memberStats = members.map(m => {
+    const s = getMemberSeasonStats(m);
+    return { name: m, ...s };
+  }).sort((a, b) => b.pts - a.pts || b.w - a.w);
+
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">';
+  memberStats.forEach((m, rank) => {
+    const idx = members.indexOf(m.name);
+    const color = getMemberColor(idx >= 0 ? idx : 0);
+    html += '<div style="flex:1;min-width:120px;background:var(--card);border:1px solid ' + color + ';border-radius:8px;padding:10px;text-align:center">';
+    html += '<div class="fs-xs text-dim">#' + (rank + 1) + '</div>';
+    html += '<div class="fw-700" style="color:' + color + '">' + esc(m.name) + '</div>';
+    html += '<div style="font-size:22px;font-weight:800;color:var(--gold)">' + m.pts + '</div>';
+    html += '<div class="fs-xs text-dim">' + m.w + 'W-' + m.l + 'L-' + m.p + 'P</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Week-by-week table
+  html += '<div class="table-wrap mt-8"><table><thead><tr><th>Week</th>';
+  members.forEach((m, i) => {
+    html += '<th style="color:' + getMemberColor(i) + '">' + esc(m) + '</th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  const running = {};
+  members.forEach(m => running[m] = 0);
+
+  for (let w = 1; w <= lastResultsWeek; w++) {
+    const wk = S.weeks[w];
+    if (!wk) continue;
+    const anyData = members.some(m => {
+      const r = getMemberWeeklyResults(w, m);
+      return r.total > 0;
+    });
+    if (!anyData) continue;
+
+    html += '<tr><td class="fw-700">Wk ' + w + '</td>';
+    members.forEach((m, i) => {
+      const r = getMemberWeeklyResults(w, m);
+      if (r.total > 0) {
+        running[m] += r.pts;
+        const wkColor = r.pts >= 4 ? 'var(--green)' : r.pts >= 2.5 ? 'var(--gold)' : 'var(--red)';
+        html += '<td><span class="fw-700" style="color:' + wkColor + '">' + r.w + '-' + r.l + '-' + r.p + '</span>';
+        html += ' <span class="fs-xs text-dim">(' + r.pts + ')</span>';
+        html += '<div class="fs-xs fw-700" style="color:' + getMemberColor(i) + '">' + running[m] + ' total</div></td>';
+      } else {
+        html += '<td class="text-dim fs-sm">—</td>';
+      }
+    });
+    html += '</tr>';
+  }
+
+  // Totals row
+  html += '<tr style="border-top:2px solid var(--border)">';
+  html += '<td class="fw-700">Total</td>';
+  members.forEach((m, i) => {
+    const s = getMemberSeasonStats(m);
+    html += '<td class="fw-700" style="color:' + getMemberColor(i) + ';font-size:16px">' + s.pts + ' pts</td>';
+  });
+  html += '</tr>';
+  html += '</tbody></table></div></div>';
+
+  return html;
+}
+
 function renderDashboardFull() {
   const wk = ensureWeek(S.currentWeek);
   const members = S.settings.members;
@@ -1675,6 +1994,8 @@ function renderDashboardFull() {
         ${recentActivity}
       </div>
     </div>
+
+    ${buildRunningTallyHTML()}
 
     <div class="card no-print">
       <div class="card-title">Quick Actions</div>
@@ -1782,6 +2103,115 @@ function renderInstructionsFull() {
       <div class="fs-xs text-dim mt-8">Tie-breaking order can be customized in Settings.</div>
     </div>
   `;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SECTION 14B: RENDER — ADMIN VIEW
+   ═══════════════════════════════════════════════════════════ */
+let adminSelectedWeek = null;
+
+function renderAdmin() {
+  adminSelectedWeek = S.currentWeek;
+  document.getElementById('sec-admin').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>';
+  renderAdminFull();
+}
+
+function adminChangeWeek(val) {
+  adminSelectedWeek = parseInt(val);
+  renderAdminFull();
+}
+
+function renderAdminFull() {
+  const el = document.getElementById('sec-admin');
+  const members = S.settings.members;
+  const selWeek = adminSelectedWeek || S.currentWeek;
+
+  let html = '<div class="card" style="border-color:var(--gold2)">';
+  html += '<div class="card-title" style="color:var(--gold)">&#128274; Admin — Submission Tracker</div>';
+  html += '<div class="card-sub">View pick submission status for all members across weeks</div>';
+
+  // Week selector
+  html += '<div class="form-row" style="margin-bottom:16px"><div class="form-group"><label>Week</label>';
+  html += '<select id="adminWeekSel" onchange="adminChangeWeek(this.value)" style="width:auto;min-width:120px">';
+  for (let w = 1; w <= 18; w++) {
+    html += '<option value="' + w + '"' + (w === selWeek ? ' selected' : '') + '>Week ' + w + '</option>';
+  }
+  html += '</select></div></div>';
+  const wk = ensureWeek(selWeek);
+  const submitted = wk.submitted || {};
+  const submittedCount = members.filter(m => submitted[m]).length;
+  const notSubmitted = members.filter(m => !submitted[m]);
+
+  // Summary tiles
+  html += '<div class="stat-grid" style="margin-bottom:16px">';
+  html += '<div class="stat-tile"><div class="stat-val" style="color:var(--green)">' + submittedCount + '</div><div class="stat-lbl">Submitted</div></div>';
+  html += '<div class="stat-tile"><div class="stat-val" style="color:' + (notSubmitted.length > 0 ? 'var(--red)' : 'var(--green)') + '">' + notSubmitted.length + '</div><div class="stat-lbl">Not Submitted</div></div>';
+  html += '<div class="stat-tile"><div class="stat-val">' + members.length + '</div><div class="stat-lbl">Total Members</div></div>';
+  html += '</div>';
+
+  // Alert for missing submissions
+  if (notSubmitted.length > 0) {
+    html += '<div class="alert alert-error">&#9888; <strong>Missing submissions:</strong> ' + notSubmitted.map(m => esc(m)).join(', ') + '</div>';
+  } else {
+    html += '<div class="alert alert-success">&#9989; All members have submitted their picks for Week ' + selWeek + '!</div>';
+  }
+
+  // Detailed member table
+  html += '<div class="table-wrap"><table><thead><tr>';
+  html += '<th>Member</th><th>Pick 1 (5)</th><th>Pick 2 (4)</th><th>Pick 3 (3)</th><th>Pick 4 (2)</th><th>Pick 5 (1)</th><th>Status</th><th>Submitted At</th>';
+  html += '</tr></thead><tbody>';
+
+  members.forEach(m => {
+    const picks = wk.picks[m] || [];
+    const sub = submitted[m];
+    const v = validateMemberPicks(selWeek, m);
+    const rowStyle = sub ? '' : ' style="background:var(--red-bg)"';
+    html += '<tr' + rowStyle + '>';
+    html += '<td>' + memberDot(m) + ' <strong>' + esc(m) + '</strong></td>';
+    for (let s = 0; s < 5; s++) {
+      const tid = picks[s];
+      if (tid) {
+        const sp = getContestSpread(selWeek, tid);
+        html += '<td class="fs-sm"><strong>' + esc(teamInfo(tid).abbr) + '</strong> <span class="text-gold fs-xs">' + spreadStr(sp) + '</span></td>';
+      } else {
+        html += '<td class="text-dim fs-sm">—</td>';
+      }
+    }
+    html += '<td><span class="badge badge-' + (sub ? 'approved' : v.complete ? 'due' : 'pending') + '">' + (sub ? 'Submitted' : v.complete ? 'Ready' : v.filled + '/5') + '</span></td>';
+    html += '<td class="fs-sm text-dim">' + (sub ? formatDt(sub.time) : '—') + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '</div>';
+
+  // Cross-week submission overview
+  html += '<div class="card">';
+  html += '<div class="card-title">&#128202; Season Submission Overview</div>';
+  html += '<div class="card-sub">Quick glance at submission status by week</div>';
+  html += '<div class="table-wrap"><table><thead><tr><th>Week</th>';
+  members.forEach(m => { html += '<th>' + esc(m) + '</th>'; });
+  html += '</tr></thead><tbody>';
+  for (let w = 1; w <= S.currentWeek; w++) {
+    const wwk = S.weeks[w];
+    if (!wwk) continue;
+    const wsub = wwk.submitted || {};
+    html += '<tr><td class="fw-700">Wk ' + w + '</td>';
+    members.forEach(m => {
+      if (wsub[m]) {
+        html += '<td style="text-align:center"><span class="badge badge-approved">&#9989;</span></td>';
+      } else if (wwk.finalized) {
+        html += '<td style="text-align:center"><span class="badge badge-finalized">Finalized</span></td>';
+      } else {
+        const v2 = validateMemberPicks(w, m);
+        html += '<td style="text-align:center"><span class="badge badge-' + (v2.complete ? 'due' : 'pending') + '">' + (v2.complete ? 'Ready' : v2.filled + '/5') + '</span></td>';
+      }
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></div>';
+
+  el.innerHTML = html;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2050,9 +2480,14 @@ function teamSelectHTML(memberIdx, slot, current, exclude, weekNum) {
   const selId = 'pick-' + memberIdx + '-' + slot;
   let html = '<select id="' + selId + '" onchange="onPickChange(' + memberIdx + ',' + slot + ',this.value)" style="min-width:150px;width:100%">';
   html += '<option value="">— Select Team —</option>';
-  NFL_TEAMS.forEach(t => {
+  const wk = S.weeks[weekNum];
+  const contestTeamIds = wk && wk.contestLines ? Object.keys(wk.contestLines) : [];
+  const teamsToShow = contestTeamIds.length > 0
+    ? NFL_TEAMS.filter(t => contestTeamIds.includes(t.id) || t.id === current)
+    : NFL_TEAMS;
+  teamsToShow.forEach(t => {
     const disabled = exclude.includes(t.id) && t.id !== current;
-    const spVal = getSpread(weekNum, t.id);
+    const spVal = getContestSpread(weekNum, t.id);
     const spLabel = spVal != null ? ' (' + spreadStr(spVal) + ')' : '';
     html += '<option value="' + t.id + '"' + (t.id === current ? ' selected' : '') + (disabled ? ' disabled' : '') + '>' + t.abbr + ' ' + t.name + spLabel + '</option>';
   });
@@ -2084,7 +2519,9 @@ function renderPicksFull() {
         <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto">
           ${members.map((m, i) => {
             const complete = isMemberComplete(S.currentWeek, m);
-            return '<button class="btn btn-gold" style="width:100%;padding:16px 20px;font-size:18px;min-height:56px;justify-content:center;border-radius:var(--radius)" onclick="switchPicksMemberIdx(' + i + ')">' + memberDot(m) + ' ' + esc(m) + (complete ? ' &#9989;' : '') + '</button>';
+            const mSubmitted = wk.submitted && wk.submitted[m];
+            const statusIcon = mSubmitted ? ' &#9989; Submitted' : complete ? ' &#9898; Ready' : '';
+            return '<button class="btn btn-gold" style="width:100%;padding:16px 20px;font-size:18px;min-height:56px;justify-content:center;border-radius:var(--radius)" onclick="switchPicksMemberIdx(' + i + ')">' + memberDot(m) + ' ' + esc(m) + statusIcon + '</button>';
           }).join('')}
         </div>
       </div>
@@ -2093,7 +2530,10 @@ function renderPicksFull() {
         <div style="margin-top:12px">
           ${members.map(m => {
             const v = validateMemberPicks(S.currentWeek, m);
-            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">' + memberDot(m) + ' <strong style="flex:1;margin-left:6px">' + esc(m) + '</strong><span class="badge badge-' + (v.complete ? 'win' : 'pending') + '">' + (v.complete ? 'Complete &#10003;' : v.filled + '/5 picks') + '</span></div>';
+            const msSub = wk.submitted && wk.submitted[m];
+            const msStatus = msSub ? 'approved' : v.complete ? 'win' : 'pending';
+            const msLabel = msSub ? 'Submitted &#10003;' : v.complete ? 'Complete' : v.filled + '/5 picks';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">' + memberDot(m) + ' <strong style="flex:1;margin-left:6px">' + esc(m) + '</strong><span class="badge badge-' + msStatus + '">' + msLabel + '</span></div>';
           }).join('')}
         </div>
       </div>
@@ -2131,14 +2571,17 @@ function renderPicksFull() {
 
   const memberIdx = S.settings.members.indexOf(picksActiveMember);
   const isOwnPicks = S.settings.activeMember === picksActiveMember;
-  const isSubmitted = wk.finalized === true;
+  const memberSubmitted = wk.submitted && wk.submitted[picksActiveMember];
+  const isSubmitted = memberSubmitted || wk.finalized === true;
   const canEdit = isOwnPicks && !isSubmitted;
   let grid = '<div class="card">';
   grid += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div class="card-title">' + memberDot(picksActiveMember) + ' ' + esc(picksActiveMember) + '\'s Picks</div>';
   grid += '<span class="badge badge-' + (validation.complete ? 'win' : 'pending') + '">' + (validation.complete ? 'Complete' : validation.filled + '/5') + '</span></div>';
 
-  if (isSubmitted) {
-    grid += '<div class="alert alert-warn mb-8">&#128274; Week ' + S.currentWeek + ' has been submitted. Picks are locked.</div>';
+  if (memberSubmitted) {
+    grid += '<div class="alert alert-success mb-8">&#9989; ' + esc(picksActiveMember) + ' submitted picks on ' + formatDt(memberSubmitted.time) + '. Picks are locked.</div>';
+  } else if (wk.finalized) {
+    grid += '<div class="alert alert-warn mb-8">&#128274; Week ' + S.currentWeek + ' has been finalized. Picks are locked.</div>';
   } else if (!isOwnPicks) {
     grid += '<div class="alert alert-info mb-8">&#128064; Viewing ' + esc(picksActiveMember) + '\'s picks (read-only). Switch to your tab to edit your own.</div>';
   }
@@ -2197,10 +2640,15 @@ function renderPicksFull() {
   grid += canEdit ? '<textarea id="memberNote" onchange="saveMemberNote()" placeholder="Reasoning, injury notes, etc.">' + esc(note) + '</textarea>' : '<div class="fs-sm text-dim">' + (esc(note) || 'No notes') + '</div>';
   grid += '</div>';
 
-  // Actions — only allow clearing your own picks
-  if (editable && S.settings.activeMember === picksActiveMember) {
-    grid += '<div class="btn-group mt-8">';
-    grid += '<button class="btn btn-red btn-sm" onclick="clearMemberPicksUI()">Clear My Picks</button>';
+  // Actions — submit or clear picks
+  if (S.settings.activeMember === picksActiveMember) {
+    grid += '<div class="btn-group mt-8" style="justify-content:space-between">';
+    if (!isSubmitted) {
+      grid += '<button class="btn btn-gold" style="font-size:15px;padding:12px 28px"' + (validation.complete ? ' onclick="submitPicksUI()"' : ' disabled title="Complete all 5 picks first"') + '>&#9989; Submit Picks</button>';
+      grid += '<button class="btn btn-red btn-sm" onclick="clearMemberPicksUI()">Clear My Picks</button>';
+    } else if (memberSubmitted && S.settings.commissionerOverride) {
+      grid += '<button class="btn btn-outline btn-sm" onclick="unsubmitPicksUI()">&#128275; Unsubmit (Override)</button>';
+    }
     grid += '</div>';
   }
 
@@ -2218,7 +2666,8 @@ function renderPicksFull() {
       const tid = p[s];
       summary += '<td class="fs-sm">' + (tid ? '<strong>' + esc(teamInfo(tid).abbr) + '</strong>' : '<span class="text-dim">—</span>') + '</td>';
     }
-    summary += '<td><span class="badge badge-' + (v.complete ? 'win' : 'pending') + '">' + (v.complete ? '&#10003;' : v.filled + '/5') + '</span></td>';
+    const mSub = wk.submitted && wk.submitted[m];
+    summary += '<td><span class="badge badge-' + (mSub ? 'approved' : v.complete ? 'win' : 'pending') + '">' + (mSub ? '&#9989; Submitted' : v.complete ? 'Complete' : v.filled + '/5') + '</span></td>';
     summary += '</tr>';
   });
   summary += '</tbody></table></div>';
@@ -2227,8 +2676,9 @@ function renderPicksFull() {
   members.forEach(m => {
     const p = wk.picks[m] || [];
     const v = validateMemberPicks(S.currentWeek, m);
+    const mSub2 = wk.submitted && wk.submitted[m];
     summary += '<div class="game-card">';
-    summary += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' + memberDot(m) + ' <strong style="flex:1;margin-left:4px">' + esc(m) + '</strong><span class="badge badge-' + (v.complete ? 'win' : 'pending') + '">' + (v.complete ? 'Complete' : v.filled + '/5') + '</span></div>';
+    summary += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' + memberDot(m) + ' <strong style="flex:1;margin-left:4px">' + esc(m) + '</strong><span class="badge badge-' + (mSub2 ? 'approved' : v.complete ? 'win' : 'pending') + '">' + (mSub2 ? 'Submitted' : v.complete ? 'Complete' : v.filled + '/5') + '</span></div>';
     summary += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
     for (let s = 0; s < 5; s++) {
       const tid = p[s];
@@ -2258,7 +2708,8 @@ function onPickChange(memberIdx, slot, newVal) {
   if (!member) return;
   if (S.settings.activeMember !== member) { toast('You can only edit your own picks', 'warn'); renderPicksFull(); return; }
   const wk = ensureWeek(S.currentWeek);
-  if (wk.finalized) { toast('Week is submitted — picks are locked', 'warn'); renderPicksFull(); return; }
+  if (wk.submitted && wk.submitted[member]) { toast('Picks already submitted — locked', 'warn'); renderPicksFull(); return; }
+  if (wk.finalized) { toast('Week is finalized — picks are locked', 'warn'); renderPicksFull(); return; }
   if (!wk.picks[member]) wk.picks[member] = [null,null,null,null,null];
   newVal = newVal || null;
 
@@ -2289,7 +2740,8 @@ function clearSinglePick(memberIdx, slot) {
   const member = S.settings.members[memberIdx];
   if (!member || S.settings.activeMember !== member) return;
   const wk = ensureWeek(S.currentWeek);
-  if (wk.finalized) { toast('Week is submitted — picks are locked', 'warn'); return; }
+  if (wk.submitted && wk.submitted[member]) { toast('Picks already submitted — locked', 'warn'); return; }
+  if (wk.finalized) { toast('Week is finalized — picks are locked', 'warn'); return; }
   const old = wk.picks[member][slot];
   wk.picks[member][slot] = null;
   if (old) logActivity(member + ' cleared Pick ' + (slot + 1) + ' (' + teamLabel(old) + ') for Week ' + S.currentWeek);
@@ -2300,7 +2752,8 @@ function clearSinglePick(memberIdx, slot) {
 async function clearMemberPicksUI() {
   if (S.settings.activeMember !== picksActiveMember) return;
   const wk = ensureWeek(S.currentWeek);
-  if (wk.finalized) { toast('Week is submitted — picks are locked', 'warn'); return; }
+  if (wk.submitted && wk.submitted[picksActiveMember]) { toast('Picks already submitted — locked', 'warn'); return; }
+  if (wk.finalized) { toast('Week is finalized — picks are locked', 'warn'); return; }
   const ok = await showConfirm('Clear Picks', 'Clear all of your picks for Week ' + S.currentWeek + '?');
   if (!ok) return;
   wk.picks[picksActiveMember] = [null,null,null,null,null];
@@ -2309,19 +2762,52 @@ async function clearMemberPicksUI() {
   renderPicksFull();
 }
 
+async function submitPicksUI() {
+  const member = S.settings.activeMember;
+  if (!member || member !== picksActiveMember) return;
+  const wk = ensureWeek(S.currentWeek);
+  if (!isMemberComplete(S.currentWeek, member)) { toast('Complete all 5 picks before submitting', 'warn'); return; }
+  if (wk.submitted[member]) { toast('Already submitted', 'info'); return; }
+  const picks = wk.picks[member] || [];
+  const pickLabels = picks.map(t => teamInfo(t).abbr + ' (' + spreadStr(getContestSpread(S.currentWeek, t)) + ')').join(', ');
+  const ok = await showConfirm('Submit Picks', 'Submit your Week ' + S.currentWeek + ' picks?<br><br><strong>' + esc(pickLabels) + '</strong><br><br>Once submitted, picks are locked and visible to all members.');
+  if (!ok) return;
+  wk.submitted[member] = { time: new Date().toISOString() };
+  logActivity(member + ' submitted picks for Week ' + S.currentWeek + ': ' + pickLabels);
+  toast(member + '\'s picks submitted for Week ' + S.currentWeek, 'success');
+  saveAndSync();
+  renderPicksFull();
+}
+
+async function unsubmitPicksUI() {
+  if (!S.settings.commissionerOverride) { toast('Commissioner override required', 'warn'); return; }
+  const member = picksActiveMember;
+  const wk = ensureWeek(S.currentWeek);
+  if (!wk.submitted[member]) return;
+  const ok = await showConfirm('Unsubmit Picks', 'Unsubmit ' + member + '\'s picks for Week ' + S.currentWeek + '? This will allow them to edit again.');
+  if (!ok) return;
+  delete wk.submitted[member];
+  logActivity('Commissioner unsubmitted ' + member + '\'s picks for Week ' + S.currentWeek);
+  toast(member + '\'s picks unsubmitted', 'info');
+  saveState();
+  renderPicksFull();
+}
+
 /* ═══════════════════════════════════════════════════════════
    SECTION 17: RENDER — WEIGHTED TALLY
    ═══════════════════════════════════════════════════════════ */
-let tallyView = 'table';
+let tallyView = 'auto';
 
 function renderTallyFull() {
   const el = document.getElementById('sec-tally');
   const tally = calculateTally(S.currentWeek);
   const members = S.settings.members;
   const wk = ensureWeek(S.currentWeek);
+  const isMobile = window.innerWidth <= 768;
+  const effectiveView = tallyView === 'auto' ? (isMobile ? 'card' : 'table') : tallyView;
 
-  let html = '<div class="flex-between mb-16"><div><div class="card-title" style="font-size:20px">Weighted Tally — Week ' + S.currentWeek + '</div><div class="fs-sm text-dim">Ranked by consensus support</div></div>';
-  html += '<div class="btn-group"><button class="btn ' + (tallyView==='table'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'table\';renderTallyFull()">Table</button><button class="btn ' + (tallyView==='card'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'card\';renderTallyFull()">Cards</button><button class="btn ' + (tallyView==='matrix'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'matrix\';renderTallyFull()">Matrix</button></div></div>';
+  let html = '<div style="margin-bottom:16px"><div class="card-title" style="font-size:20px">Weighted Tally — Week ' + S.currentWeek + '</div><div class="fs-sm text-dim" style="margin-bottom:10px">Ranked by consensus support</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ' + (effectiveView==='table'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'table\';renderTallyFull()">Table</button><button class="btn ' + (effectiveView==='card'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'card\';renderTallyFull()">Cards</button><button class="btn ' + (effectiveView==='matrix'?'btn-gold':'btn-outline') + ' btn-sm" onclick="tallyView=\'matrix\';renderTallyFull()">Matrix</button></div></div>';
 
   // Tie-breaking display
   const tbLabels = {score:'Weighted Score',members:'Member Count',pick1:'Pick 1 Count',pick2:'Pick 2 Count',alpha:'Alphabetical'};
@@ -2336,20 +2822,24 @@ function renderTallyFull() {
   // Top 5 highlight
   html += '<div class="card" style="border-color:var(--gold2);background:var(--gold-bg)">';
   html += '<div class="card-title text-gold">&#127942; Top 5 Consensus Picks</div>';
-  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">';
+  html += '<div class="card-sub" style="margin-bottom:10px">These are the group\'s strongest plays by weighted score</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">';
   tally.slice(0, 5).forEach((t, i) => {
-    html += '<div style="background:var(--bg2);border:1px solid var(--gold2);border-radius:var(--radius);padding:10px 16px;text-align:center;min-width:100px">';
+    const sp = getContestSpread(S.currentWeek, t.teamId);
+    html += '<div style="background:var(--bg2);border:1px solid var(--gold2);border-radius:var(--radius);padding:12px;text-align:center">';
     html += '<div class="fs-xs text-dim">#' + (i+1) + '</div>';
-    html += '<div class="fw-700" style="font-size:16px">' + esc(teamInfo(t.teamId).abbr) + '</div>';
+    html += '<div class="fw-700" style="font-size:18px">' + esc(teamInfo(t.teamId).abbr) + '</div>';
     html += '<div class="fs-xs">' + esc(teamInfo(t.teamId).name) + '</div>';
-    html += '<div class="text-gold fw-700">' + t.score + ' pts</div>';
+    html += '<div class="text-gold fw-700" style="font-size:14px">' + spreadStr(sp) + '</div>';
+    html += '<div style="font-size:20px;font-weight:800;color:var(--gold);margin:4px 0">' + t.score + ' pts</div>';
     html += '<div class="fs-xs text-dim">' + t.memberCount + '/5 members</div>';
-    if (i > 0 && hasTie(tally, i)) html += '<div class="tie-indicator">TIE</div>';
+    html += '<div class="fs-xs text-dim">' + Object.keys(t.supporters).map(m => esc(m)).join(', ') + '</div>';
+    if (i > 0 && hasTie(tally, i)) html += '<div class="tie-indicator" style="margin-top:4px">TIE</div>';
     html += '</div>';
   });
   html += '</div></div>';
 
-  if (tallyView === 'table') {
+  if (effectiveView === 'table') {
     html += '<div class="card"><div class="table-wrap"><table>';
     html += '<thead><tr><th>#</th><th>Team</th><th>Spread</th><th>Score</th><th>Members</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th>';
     members.forEach(m => html += '<th>' + esc(m.charAt(0)) + '</th>');
@@ -2375,7 +2865,7 @@ function renderTallyFull() {
       html += '</tr>';
     });
     html += '</tbody></table></div></div>';
-  } else if (tallyView === 'card') {
+  } else if (effectiveView === 'card') {
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">';
     tally.forEach((t, i) => {
       const isTop5 = i < 5;
@@ -2388,7 +2878,7 @@ function renderTallyFull() {
       html += '</div>';
     });
     html += '</div>';
-  } else if (tallyView === 'matrix') {
+  } else if (effectiveView === 'matrix') {
     html += '<div class="card"><div class="card-title">Member × Team Matrix</div><div class="table-wrap mt-8"><table><thead><tr><th>Team</th>';
     members.forEach(m => html += '<th>' + memberDot(m) + ' ' + esc(m) + '</th>');
     html += '<th>Total</th></tr></thead><tbody>';
@@ -3018,7 +3508,10 @@ function renderLinesFull() {
   const gameList = Object.values(games).sort((a,b) => (a.gameDate||'').localeCompare(b.gameDate||''));
 
   let html = '<div style="margin-bottom:16px"><div class="card-title" style="font-size:20px">Lines & Spreads — Week ' + S.currentWeek + '</div><div class="fs-sm text-dim">' + gameList.length + ' games | ' + contestCount + ' contest lines locked</div>';
-  html += '<div style="margin-top:10px"><button class="btn btn-gold" onclick="fetchESPNLinesUI()">&#9889; Fetch Live Lines</button></div></div>';
+  html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<button class="btn btn-gold" onclick="fetchESPNLinesUI()">&#9889; Fetch Live Lines</button>';
+  if (editable) html += '<button class="btn btn-gold" onclick="showCircaContestImport()" style="background:linear-gradient(135deg,var(--gold),#b8860b)">&#127944; Import Circa Lines</button>';
+  html += '</div></div>';
 
   // ═══ UNIFIED GAME BOARD ═══
   html += '<div class="card"><div class="card-title">&#127944; Week ' + S.currentWeek + ' Game Board</div>';
@@ -3220,17 +3713,38 @@ function fetchLinesUI() {
 async function fetchESPNLinesUI() {
   // ESPN is primary — no API key needed, reliable
   const espnCount = await fetchESPNLinesForWeek(S.currentWeek);
-  if (espnCount > 0) { renderLinesFull(); return; }
+  if (espnCount > 0) {
+    renderLinesFull();
+    promptForContestLinesIfNeeded();
+    return;
+  }
 
   // Fall back to Odds API if ESPN returned nothing and key is configured
   if (S.settings.oddsApiKey) {
     toast('ESPN returned no data, trying Odds API...', 'warn');
     const oddsCount = await fetchOddsAPILines(S.currentWeek);
-    if (oddsCount > 0) { renderLinesFull(); return; }
+    if (oddsCount > 0) {
+      renderLinesFull();
+      promptForContestLinesIfNeeded();
+      return;
+    }
   }
 
   toast('Could not fetch lines. ESPN may not have data for Week ' + S.currentWeek + ' yet.', 'error');
   renderLinesFull();
+}
+
+function promptForContestLinesIfNeeded() {
+  const wk = ensureWeek(S.currentWeek);
+  const contestCount = Object.keys(wk.contestLines || {}).length;
+  if (contestCount > 0 || !isWeekEditable(S.currentWeek)) return;
+  setTimeout(() => {
+    showConfirm(
+      'Set Circa Contest Lines?',
+      'Market lines loaded. Do you want to enter this week\'s <strong style="color:var(--gold)">Circa Million VIII contest spreads</strong> now?<br><br>' +
+      '<span class="fs-sm text-dim">The market lines will be pre-filled as a starting point — adjust them to match the Circa posted spreads.</span>'
+    ).then(ok => { if (ok) showCircaContestImport(); });
+  }, 500);
 }
 
 function addContestLine() {
@@ -3595,10 +4109,30 @@ function seedHistoricalData() {
   w2.entries[3] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
   w2.entries[4] = {picks:['PHI','KC','LAR','CAR','SEA'],status:'finalized',notes:'Consensus copy',manuallyEdited:false};
 
-  // Set current week to 2
-  S.currentWeek = 2;
+  // Week 3 picks
+  var w3 = ensureWeek(3);
+  w3.picks["D'"] = ['DEN',null,null,null,null];
 
-  logActivity('Historical data loaded: Week 1 (3-2) and Week 2 picks from Google Sheet');
+  // Week 3 contest lines from Circa Million VIII PDF
+  var w3lines = {
+    'ATL':4.5, 'GB':-4.5, 'SEA':-7.5, 'WAS':7.5,
+    'CIN':-3.5, 'PIT':3.5, 'NYJ':6.5, 'DET':-6.5,
+    'TEN':2.5, 'NYG':-2.5, 'NE':3, 'JAX':-3,
+    'KC':-11.5, 'MIA':11.5, 'HOU':-1.5, 'IND':1.5,
+    'CAR':-2.5, 'CLE':2.5, 'LAC':7, 'BUF':-7,
+    'MIN':-1, 'TB':1, 'ARI':8.5, 'SF':-8.5,
+    'LV':3, 'NO':-3, 'BAL':-3, 'DAL':3,
+    'LAR':-2.5, 'DEN':2.5, 'PHI':-4.5, 'CHI':4.5
+  };
+  for (var tid3 in w3lines) {
+    w3.contestLines[tid3] = { spread: w3lines[tid3], lockedAt: '2026-09-25T00:00:00Z', source: 'Circa Contest' };
+    w3.lines[tid3] = { spread: w3lines[tid3], source: 'Circa Contest', manual: true, lastUpdate: '2026-09-25T00:00:00Z' };
+  }
+
+  // Set current week to 3
+  S.currentWeek = 3;
+
+  logActivity('Historical data loaded: Weeks 1-2 picks and Week 3 contest lines from Circa Million VIII');
   saveStateLocal();
 }
 
