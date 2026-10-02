@@ -4341,9 +4341,35 @@ function seedHistoricalData() {
   if (hasData) {
     var needsSave = false;
 
-    // Ensure Week 2 is finalized
-    if (S.weeks[2] && !S.weeks[2].finalized) {
-      S.weeks[2].finalized = true;
+    // Ensure Week 2 is finalized with results
+    if (S.weeks[2]) {
+      if (!S.weeks[2].finalized) {
+        S.weeks[2].finalized = true;
+        needsSave = true;
+      }
+      if (!S.weeks[2].results || Object.keys(S.weeks[2].results).length === 0) {
+        S.weeks[2].results = {
+          'PHI':'loss', 'KC':'loss', 'LAR':'win', 'CAR':'win', 'SEA':'win',
+          'SF':'win', 'BAL':'loss', 'MIN':'win', 'LAC':'loss', 'GB':'loss',
+          'PIT':'loss', 'DAL':'win', 'JAX':'loss', 'DEN':'win'
+        };
+        needsSave = true;
+      }
+    }
+
+    // Ensure Week 3 results
+    var w3r = ensureWeek(3);
+    if (!w3r.results || Object.keys(w3r.results).length === 0) {
+      w3r.results = {
+        'ATL':'win', 'GB':'loss', 'LAC':'loss', 'BUF':'win',
+        'CAR':'loss', 'CLE':'win', 'NYJ':'loss', 'DET':'win',
+        'HOU':'loss', 'IND':'win', 'KC':'win', 'MIA':'loss',
+        'TEN':'loss', 'NYG':'win', 'CIN':'loss', 'PIT':'win',
+        'SEA':'loss', 'WAS':'win', 'NE':'loss', 'JAX':'win',
+        'ARI':'win', 'SF':'loss', 'MIN':'win', 'TB':'loss',
+        'BAL':'push', 'DAL':'push', 'LV':'win', 'NO':'loss',
+        'LAR':'loss', 'DEN':'win', 'PHI':'loss', 'CHI':'win'
+      };
       needsSave = true;
     }
 
@@ -4446,6 +4472,13 @@ function seedHistoricalData() {
 
   w2.finalized = true;
 
+  // Week 2 results (ATS vs Circa contest spreads — scores from ESPN)
+  w2.results = {
+    'PHI':'loss', 'KC':'loss', 'LAR':'win', 'CAR':'win', 'SEA':'win',
+    'SF':'win', 'BAL':'loss', 'MIN':'win', 'LAC':'loss', 'GB':'loss',
+    'PIT':'loss', 'DAL':'win', 'JAX':'loss', 'DEN':'win'
+  };
+
   // Week 3 picks from Google Sheet
   var w3 = ensureWeek(3);
   w3.picks['Errol']   = ['KC',null,'PHI','CAR','DET'];
@@ -4467,6 +4500,18 @@ function seedHistoricalData() {
     w3.contestLines[tid3] = { spread: w3lines[tid3], lockedAt: '2026-09-25T00:00:00Z', source: 'Circa Contest' };
     w3.lines[tid3] = { spread: w3lines[tid3], source: 'Circa Contest', manual: true, lastUpdate: '2026-09-25T00:00:00Z' };
   }
+
+  // Week 3 results (ATS vs Circa contest spreads — scores from ESPN)
+  w3.results = {
+    'ATL':'win', 'GB':'loss', 'LAC':'loss', 'BUF':'win',
+    'CAR':'loss', 'CLE':'win', 'NYJ':'loss', 'DET':'win',
+    'HOU':'loss', 'IND':'win', 'KC':'win', 'MIA':'loss',
+    'TEN':'loss', 'NYG':'win', 'CIN':'loss', 'PIT':'win',
+    'SEA':'loss', 'WAS':'win', 'NE':'loss', 'JAX':'win',
+    'ARI':'win', 'SF':'loss', 'MIN':'win', 'TB':'loss',
+    'BAL':'push', 'DAL':'push', 'LV':'win', 'NO':'loss',
+    'LAR':'loss', 'DEN':'win', 'PHI':'loss', 'CHI':'win'
+  };
 
   // Week 4 contest lines from Circa Million VIII PDF
   var w4 = ensureWeek(4);
