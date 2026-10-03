@@ -14,7 +14,7 @@
 <title>Circa Pool Manager — Syndicate Tool</title>
 <script>
 // Cache buster — forces reload when version changes
-(function(){var V='5';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
+(function(){var V='6';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
 </script>
 <style>
 /* ═══ THEME VARIABLES ═══ */
@@ -449,7 +449,7 @@ tr:hover td{background:var(--bg3)}
 /* ═══════════════════════════════════════════════════════════
    SECTION 1: CONSTANTS & NFL TEAM DATA
    ═══════════════════════════════════════════════════════════ */
-const SEED_VERSION = 5;
+const SEED_VERSION = 6;
 const WEIGHTS = [5, 4, 3, 2, 1];
 const TOTAL_WEEKS = 18;
 const DEFAULT_MEMBERS = ['Errol', 'Marlon', 'DeMarlo', 'Alan', "D'"];
@@ -4378,6 +4378,14 @@ function updateMemberBanner() {
    SECTION 25: INITIALIZATION
    ═══════════════════════════════════════════════════════════ */
 function applyDataPatches() {
+  // Non-destructive patch: only fill picks if member has NO data
+  function patchPicks(wk, member, picks) {
+    var existing = wk.picks[member];
+    if (!existing || existing.every(function(p) { return !p; })) {
+      wk.picks[member] = picks;
+    }
+  }
+
   // Week 2: finalize + ATS results
   if (S.weeks[2]) {
     S.weeks[2].finalized = true;
@@ -4388,11 +4396,11 @@ function applyDataPatches() {
     };
   }
 
-  // Week 3: picks from Google Sheet + ATS results
+  // Week 3: picks (only if empty) + ATS results
   var w3p = ensureWeek(3);
-  w3p.picks['Errol'] = ['KC',null,'PHI','CAR','DET'];
-  w3p.picks['Alan']  = ['BUF','CAR','KC','DET','NO'];
-  if (!w3p.picks["D'"] || !w3p.picks["D'"][0]) w3p.picks["D'"] = ['DEN',null,null,null,null];
+  patchPicks(w3p, 'Errol', ['KC',null,'PHI','CAR','DET']);
+  patchPicks(w3p, 'Alan', ['BUF','CAR','KC','DET','NO']);
+  patchPicks(w3p, "D'", ['DEN',null,null,null,null]);
   w3p.results = {
     'ATL':'win', 'GB':'loss', 'LAC':'loss', 'BUF':'win',
     'CAR':'loss', 'CLE':'win', 'NYJ':'loss', 'DET':'win',
