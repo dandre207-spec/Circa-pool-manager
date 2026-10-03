@@ -14,7 +14,7 @@
 <title>Circa Pool Manager — Syndicate Tool</title>
 <script>
 // Cache buster — forces reload when version changes
-(function(){var V='4';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
+(function(){var V='5';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
 </script>
 <style>
 /* ═══ THEME VARIABLES ═══ */
@@ -449,7 +449,7 @@ tr:hover td{background:var(--bg3)}
 /* ═══════════════════════════════════════════════════════════
    SECTION 1: CONSTANTS & NFL TEAM DATA
    ═══════════════════════════════════════════════════════════ */
-const SEED_VERSION = 4;
+const SEED_VERSION = 5;
 const WEIGHTS = [5, 4, 3, 2, 1];
 const TOTAL_WEEKS = 18;
 const DEFAULT_MEMBERS = ['Errol', 'Marlon', 'DeMarlo', 'Alan', "D'"];
@@ -1808,7 +1808,15 @@ function loadDemoData() {
 }
 
 /* placeholder — render functions added in next parts */
-function renderDashboard() { document.getElementById('sec-dashboard').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderDashboardFull(); }
+function renderDashboard() {
+  document.getElementById('sec-dashboard').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>';
+  renderDashboardFull();
+  if (SheetSync.getUrl() && S.settings.autoSync) {
+    SheetSync.pullWeek(S.currentWeek).then(function(ok) {
+      if (ok) renderDashboardFull();
+    });
+  }
+}
 function renderPicks() { document.getElementById('sec-picks').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderPicksFull(); }
 function renderTally() { document.getElementById('sec-tally').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderTallyFull(); }
 function renderEntries() { document.getElementById('sec-entries').innerHTML = '<div class="card"><div class="card-title">Loading...</div></div>'; renderEntriesFull(); }
@@ -4004,14 +4012,32 @@ const SheetSync = {
   async apiPost(data) {
     const url = this.getUrl();
     if (!url) return null;
-    const res = await fetch(url, {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return res.json();
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(data)
+      });
+      const text = await res.text();
+      try { return JSON.parse(text); } catch(e) {
+        // GAS redirects can return HTML on success — server still executed
+        return { success: true };
+      }
+    } catch(err) {
+      // Fallback for iOS Safari where POST+redirect triggers CORS failure
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(data)
+        });
+        return { success: true, fallback: true };
+      } catch(err2) {
+        throw err;
+      }
+    }
   },
 
   async testConnection() {
@@ -4246,6 +4272,8 @@ async function autoSyncPull() {
     var isLocalSubmitted = wk.submitted && wk.submitted[activeMember];
     if (!isLocalSubmitted) {
       localPicks = (wk.picks[activeMember] || []).slice();
+    } else {
+      localSubmitted = wk.submitted[activeMember];
     }
   }
   var oldSubmitted = {};
@@ -4260,6 +4288,15 @@ async function autoSyncPull() {
     if (!remoteSubmitted) {
       newWk.picks[activeMember] = localPicks;
       saveStateLocal();
+    }
+  }
+  if (localSubmitted && activeMember && newWk) {
+    var remoteHasSubmission = newWk.submitted && newWk.submitted[activeMember];
+    if (!remoteHasSubmission) {
+      if (!newWk.submitted) newWk.submitted = {};
+      newWk.submitted[activeMember] = localSubmitted;
+      saveStateLocal();
+      SheetSync.pushSubmission(S.currentWeek, activeMember, localSubmitted.time);
     }
   }
   if (newWk && newWk.submitted) {
