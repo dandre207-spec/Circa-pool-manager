@@ -4412,8 +4412,9 @@ function applyDataPatches() {
     'LAR':'loss', 'DEN':'win', 'PHI':'loss', 'CHI':'win'
   };
 
-  // Week 4: contest lines from Circa Million VIII PDF
+  // Week 4: picks + contest lines from Circa Million VIII PDF
   var w4p = ensureWeek(4);
+  patchPicks(w4p, 'Alan', ['CHI','SF','KC','SEA','DAL']);
   var w4g = [
     { away:'PIT', home:'CLE', awaySpread:-3, homeSpread:3, date:'Thu Oct 1, 5:15 PM' },
     { away:'IND', home:'WAS', awaySpread:-3.5, homeSpread:3.5, date:'Sun Oct 4, 6:30 AM (London)' },
@@ -4545,8 +4546,11 @@ function seedHistoricalData() {
     'LAR':'loss', 'DEN':'win', 'PHI':'loss', 'CHI':'win'
   };
 
-  // Week 4 contest lines from Circa Million VIII PDF
+  // Week 4 picks (confirmed from Google Sheet)
   var w4 = ensureWeek(4);
+  patchPicks(w4, 'Alan', ['CHI','SF','KC','SEA','DAL']);
+
+  // Week 4 contest lines from Circa Million VIII PDF
   var w4games = [
     { away:'PIT', home:'CLE', awaySpread:-3, homeSpread:3, date:'Thu Oct 1, 5:15 PM' },
     { away:'IND', home:'WAS', awaySpread:-3.5, homeSpread:3.5, date:'Sun Oct 4, 6:30 AM (London)' },
@@ -4595,8 +4599,8 @@ function init() {
     if (!S.settings.activeMember) {
       showSetupOverlay();
     } else if (SheetSync.getUrl() && S.settings.autoSync) {
-      SheetSync.pullWeek(S.currentWeek).then(function(ok) {
-        if (ok) renderCurrentSection();
+      autoSyncPull().then(function() {
+        renderCurrentSection();
       });
     }
 
