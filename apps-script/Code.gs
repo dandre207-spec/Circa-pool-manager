@@ -21,8 +21,14 @@ function doGet(e) {
     let result;
 
     switch (action) {
+      case 'getWeek':
+        result = getWeek(parseInt(e.parameter.week) || 1);
+        break;
       case 'getWeekPicks':
         result = getWeekPicks(parseInt(e.parameter.week) || 1);
+        break;
+      case 'getContestLines':
+        result = getContestLines(parseInt(e.parameter.week) || 0);
         break;
       case 'getAllWeeks':
         result = getAllWeeks();
@@ -37,7 +43,7 @@ function doGet(e) {
         result = { ok: true, timestamp: new Date().toISOString(), sheetId: SHEET_ID };
         break;
       default:
-        result = { error: 'Unknown action. Use: getWeekPicks, getAllWeeks, getDashboard, getResults, ping' };
+        result = { error: 'Unknown action. Use: getWeek, getWeekPicks, getContestLines, getAllWeeks, getDashboard, getResults, ping' };
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -165,9 +171,15 @@ function getWeekPicks(weekNum) {
 
 function getAllWeeks() {
   var allWeeks = {};
+  var linesData = getContestLines(0);
+  var linesWeek = linesData.week || 0;
+
   for (var w = 1; w <= 18; w++) {
     var data = getWeekPicks(w);
     if (!data.error) {
+      if (w === linesWeek) {
+        data.lines = linesData.lines;
+      }
       allWeeks[w] = data;
     }
   }
@@ -330,6 +342,53 @@ function removeSubmission(weekNum, member) {
     timestamp: new Date().toISOString()
   };
 }
+
+// ─── Contest Lines ───
+
+function getContestLines(weekNum) {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('Contest Lines');
+  if (!sheet) return { week: weekNum, lines: {}, error: 'Contest Lines sheet not found' };
+
+  var header = (sheet.getRange('A1').getValue() || '').toString();
+  var weekMatch = header.match(/WEEK\s+(\d+)/i);
+  var sheetWeek = weekMatch ? parseInt(weekMatch[1]) : 0;
+
+  if (weekNum > 0 && sheetWeek !== weekNum) {
+    return { week: weekNum, lines: {}, note: 'Contest Lines sheet shows Week ' + sheetWeek };
+  }
+
+  var range = sheet.getRange('A5:F20');
+  var values = range.getValues();
+  var lines = {};
+
+  values.forEach(function(row) {
+    var away = (row[1] || '').toString().trim();
+    var home = (row[3] || '').toString().trim();
+    var awaySpread = parseFloat(row[4]);
+    var homeSpread = parseFloat(row[5]);
+
+    if (away && !isNaN(awaySpread)) {
+      var awayId = teamNameToId(away);
+      if (awayId) lines[awayId] = { spread: awaySpread, source: 'Circa Contest' };
+    }
+    if (home && !isNaN(homeSpread)) {
+      var homeId = teamNameToId(home);
+      if (homeId) lines[homeId] = { spread: homeSpread, source: 'Circa Contest' };
+    }
+  });
+
+  return { week: sheetWeek || weekNum, lines: lines, timestamp: new Date().toISOString() };
+}
+
+function getWeek(weekNum) {
+  var picksData = getWeekPicks(weekNum);
+  var linesData = getContestLines(weekNum);
+  picksData.lines = linesData.lines || {};
+  return picksData;
+}
+
+// ─── Results ───
 
 function saveResults(weekNum, results) {
   if (!results || typeof results !== 'object') {
