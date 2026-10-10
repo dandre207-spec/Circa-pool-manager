@@ -14,7 +14,7 @@
 <title>Circa Pool Manager — Syndicate Tool</title>
 <script>
 // Cache buster — forces reload when version changes
-(function(){var V='6';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
+(function(){var V='8';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
 </script>
 <style>
 /* ═══ THEME VARIABLES ═══ */
@@ -449,7 +449,7 @@ tr:hover td{background:var(--bg3)}
 /* ═══════════════════════════════════════════════════════════
    SECTION 1: CONSTANTS & NFL TEAM DATA
    ═══════════════════════════════════════════════════════════ */
-const SEED_VERSION = 6;
+const SEED_VERSION = 8;
 const WEIGHTS = [5, 4, 3, 2, 1];
 const TOTAL_WEEKS = 18;
 const DEFAULT_MEMBERS = ['Errol', 'Marlon', 'DeMarlo', 'Alan', "D'"];
@@ -4399,8 +4399,10 @@ function applyDataPatches() {
   // Week 3: picks (only if empty) + ATS results
   var w3p = ensureWeek(3);
   patchPicks(w3p, 'Errol', ['KC',null,'PHI','CAR','DET']);
+  patchPicks(w3p, 'Marlon', ['DET','SEA','NO','IND','PHI']);
+  patchPicks(w3p, 'DeMarlo', ['BUF','CAR','MIN','DET','NO']);
   patchPicks(w3p, 'Alan', ['BUF','CAR','KC','DET','NO']);
-  patchPicks(w3p, "D'", ['DEN',null,null,null,null]);
+  patchPicks(w3p, "D'", ['DEN','LV','ARI','JAX','CIN']);
   w3p.results = {
     'ATL':'win', 'GB':'loss', 'LAC':'loss', 'BUF':'win',
     'CAR':'loss', 'CLE':'win', 'NYJ':'loss', 'DET':'win',
@@ -4412,9 +4414,13 @@ function applyDataPatches() {
     'LAR':'loss', 'DEN':'win', 'PHI':'loss', 'CHI':'win'
   };
 
-  // Week 4: picks + contest lines from Circa Million VIII PDF
+  // Week 4: all member picks (from tally export) + contest lines
   var w4p = ensureWeek(4);
+  patchPicks(w4p, 'Errol', ['ARI','LAR','ATL','CAR','KC']);
+  patchPicks(w4p, 'Marlon', ['SF','LAR','SEA','BUF','DAL']);
+  patchPicks(w4p, 'DeMarlo', ['BUF','DET','SF','SEA','IND']);
   patchPicks(w4p, 'Alan', ['CHI','SF','KC','SEA','DAL']);
+  patchPicks(w4p, "D'", ['LAR','DEN','BUF','LV','JAX']);
   var w4g = [
     { away:'PIT', home:'CLE', awaySpread:-3, homeSpread:3, date:'Thu Oct 1, 5:15 PM' },
     { away:'IND', home:'WAS', awaySpread:-3.5, homeSpread:3.5, date:'Sun Oct 4, 6:30 AM (London)' },
@@ -4439,6 +4445,31 @@ function applyDataPatches() {
     w4p.lines[g.home] = { spread: g.homeSpread, opponent: g.away, homeAway: 'home', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-02T00:00:00Z' };
     w4p.lines[g.away] = { spread: g.awaySpread, opponent: g.home, homeAway: 'away', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-02T00:00:00Z' };
   });
+
+  // Week 5: contest lines from Circa Million VIII
+  var w5p = ensureWeek(5);
+  var w5g = [
+    { away:'PHI', home:'JAX', awaySpread:7.5, homeSpread:-7.5, date:'Sun Oct 11, 6:30 AM' },
+    { away:'IND', home:'PIT', awaySpread:2.5, homeSpread:-2.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'MIN', home:'NO', awaySpread:-2, homeSpread:2, date:'Sun Oct 11, 10:00 AM' },
+    { away:'CLE', home:'NYJ', awaySpread:1.5, homeSpread:-1.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'CIN', home:'MIA', awaySpread:-7, homeSpread:7, date:'Sun Oct 11, 10:00 AM' },
+    { away:'LV', home:'NE', awaySpread:3.5, homeSpread:-3.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'NYG', home:'WAS', awaySpread:4, homeSpread:-4, date:'Sun Oct 11, 10:00 AM' },
+    { away:'HOU', home:'TEN', awaySpread:-7.5, homeSpread:7.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'CHI', home:'GB', awaySpread:-1.5, homeSpread:1.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'DEN', home:'LAC', awaySpread:-3.5, homeSpread:3.5, date:'Sun Oct 11, 1:05 PM' },
+    { away:'SF', home:'SEA', awaySpread:3, homeSpread:-3, date:'Sun Oct 11, 1:25 PM' },
+    { away:'DET', home:'ARI', awaySpread:-5.5, homeSpread:5.5, date:'Sun Oct 11, 1:25 PM' },
+    { away:'BAL', home:'ATL', awaySpread:3.5, homeSpread:-3.5, date:'Sun Oct 11, 5:20 PM' },
+    { away:'BUF', home:'LAR', awaySpread:3, homeSpread:-3, date:'Mon Oct 12, 5:15 PM' }
+  ];
+  w5g.forEach(function(g) {
+    w5p.contestLines[g.home] = { spread: g.homeSpread, lockedAt: '2026-10-09T00:00:00Z', source: 'Circa Contest' };
+    w5p.contestLines[g.away] = { spread: g.awaySpread, lockedAt: '2026-10-09T00:00:00Z', source: 'Circa Contest' };
+    w5p.lines[g.home] = { spread: g.homeSpread, opponent: g.away, homeAway: 'home', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-09T00:00:00Z' };
+    w5p.lines[g.away] = { spread: g.awaySpread, opponent: g.home, homeAway: 'away', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-09T00:00:00Z' };
+  });
 }
 
 function seedHistoricalData() {
@@ -4450,7 +4481,7 @@ function seedHistoricalData() {
   if (hasData && (!S.seedVersion || S.seedVersion < SEED_VERSION)) {
     applyDataPatches();
     S.seedVersion = SEED_VERSION;
-    if (S.currentWeek < 4) S.currentWeek = 4;
+    if (S.currentWeek < 5) S.currentWeek = 5;
     saveStateLocal();
     return;
   }
@@ -4512,11 +4543,13 @@ function seedHistoricalData() {
     'PIT':'loss', 'DAL':'win', 'JAX':'loss', 'DEN':'win'
   };
 
-  // Week 3 picks from Google Sheet
+  // Week 3 picks (complete from tally export)
   var w3 = ensureWeek(3);
   w3.picks['Errol']   = ['KC',null,'PHI','CAR','DET'];
+  w3.picks['Marlon']  = ['DET','SEA','NO','IND','PHI'];
+  w3.picks['DeMarlo'] = ['BUF','CAR','MIN','DET','NO'];
   w3.picks['Alan']    = ['BUF','CAR','KC','DET','NO'];
-  w3.picks["D'"]      = ['DEN',null,null,null,null];
+  w3.picks["D'"]      = ['DEN','LV','ARI','JAX','CIN'];
 
   // Week 3 contest lines from Circa Million VIII PDF
   var w3lines = {
@@ -4546,9 +4579,13 @@ function seedHistoricalData() {
     'LAR':'loss', 'DEN':'win', 'PHI':'loss', 'CHI':'win'
   };
 
-  // Week 4 picks (confirmed from Google Sheet)
+  // Week 4 picks (from tally export)
   var w4 = ensureWeek(4);
-  patchPicks(w4, 'Alan', ['CHI','SF','KC','SEA','DAL']);
+  w4.picks['Errol']   = ['ARI','LAR','ATL','CAR','KC'];
+  w4.picks['Marlon']  = ['SF','LAR','SEA','BUF','DAL'];
+  w4.picks['DeMarlo'] = ['BUF','DET','SF','SEA','IND'];
+  w4.picks['Alan']    = ['CHI','SF','KC','SEA','DAL'];
+  w4.picks["D'"]      = ['LAR','DEN','BUF','LV','JAX'];
 
   // Week 4 contest lines from Circa Million VIII PDF
   var w4games = [
@@ -4576,11 +4613,36 @@ function seedHistoricalData() {
     w4.lines[g.away] = { spread: g.awaySpread, opponent: g.home, homeAway: 'away', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-02T00:00:00Z' };
   });
 
-  // Set current week to 4
-  S.currentWeek = 4;
+  // Week 5 contest lines from Circa Million VIII
+  var w5 = ensureWeek(5);
+  var w5games = [
+    { away:'PHI', home:'JAX', awaySpread:7.5, homeSpread:-7.5, date:'Sun Oct 11, 6:30 AM' },
+    { away:'IND', home:'PIT', awaySpread:2.5, homeSpread:-2.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'MIN', home:'NO', awaySpread:-2, homeSpread:2, date:'Sun Oct 11, 10:00 AM' },
+    { away:'CLE', home:'NYJ', awaySpread:1.5, homeSpread:-1.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'CIN', home:'MIA', awaySpread:-7, homeSpread:7, date:'Sun Oct 11, 10:00 AM' },
+    { away:'LV', home:'NE', awaySpread:3.5, homeSpread:-3.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'NYG', home:'WAS', awaySpread:4, homeSpread:-4, date:'Sun Oct 11, 10:00 AM' },
+    { away:'HOU', home:'TEN', awaySpread:-7.5, homeSpread:7.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'CHI', home:'GB', awaySpread:-1.5, homeSpread:1.5, date:'Sun Oct 11, 10:00 AM' },
+    { away:'DEN', home:'LAC', awaySpread:-3.5, homeSpread:3.5, date:'Sun Oct 11, 1:05 PM' },
+    { away:'SF', home:'SEA', awaySpread:3, homeSpread:-3, date:'Sun Oct 11, 1:25 PM' },
+    { away:'DET', home:'ARI', awaySpread:-5.5, homeSpread:5.5, date:'Sun Oct 11, 1:25 PM' },
+    { away:'BAL', home:'ATL', awaySpread:3.5, homeSpread:-3.5, date:'Sun Oct 11, 5:20 PM' },
+    { away:'BUF', home:'LAR', awaySpread:3, homeSpread:-3, date:'Mon Oct 12, 5:15 PM' }
+  ];
+  w5games.forEach(function(g) {
+    w5.contestLines[g.home] = { spread: g.homeSpread, lockedAt: '2026-10-09T00:00:00Z', source: 'Circa Contest' };
+    w5.contestLines[g.away] = { spread: g.awaySpread, lockedAt: '2026-10-09T00:00:00Z', source: 'Circa Contest' };
+    w5.lines[g.home] = { spread: g.homeSpread, opponent: g.away, homeAway: 'home', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-09T00:00:00Z' };
+    w5.lines[g.away] = { spread: g.awaySpread, opponent: g.home, homeAway: 'away', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-09T00:00:00Z' };
+  });
+
+  // Set current week to 5
+  S.currentWeek = 5;
 
   S.seedVersion = SEED_VERSION;
-  logActivity('Historical data loaded: Weeks 1-3 picks and Week 4 contest lines from Circa Million VIII');
+  logActivity('Historical data loaded: Weeks 1-4 picks and Week 5 contest lines from Circa Million VIII');
   saveStateLocal();
 }
 
