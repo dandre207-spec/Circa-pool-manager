@@ -14,7 +14,7 @@
 <title>Circa Pool Manager — Syndicate Tool</title>
 <script>
 // Cache buster — forces reload when version changes
-(function(){var V='8';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
+(function(){var V='9';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
 </script>
 <style>
 /* ═══ THEME VARIABLES ═══ */
@@ -449,7 +449,7 @@ tr:hover td{background:var(--bg3)}
 /* ═══════════════════════════════════════════════════════════
    SECTION 1: CONSTANTS & NFL TEAM DATA
    ═══════════════════════════════════════════════════════════ */
-const SEED_VERSION = 8;
+const SEED_VERSION = 9;
 const WEIGHTS = [5, 4, 3, 2, 1];
 const TOTAL_WEEKS = 18;
 const DEFAULT_MEMBERS = ['Errol', 'Marlon', 'DeMarlo', 'Alan', "D'"];
@@ -4446,6 +4446,19 @@ function applyDataPatches() {
     w4p.lines[g.away] = { spread: g.awaySpread, opponent: g.home, homeAway: 'away', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-02T00:00:00Z' };
   });
 
+  // Week 4: ATS results vs Circa contest spreads
+  w4p.results = {
+    'PIT':'loss','CLE':'win','IND':'win','WAS':'loss',
+    'NE':'win','BUF':'loss','NYJ':'loss','CHI':'win',
+    'ARI':'loss','NYG':'win','DAL':'win','HOU':'loss',
+    'JAX':'win','CIN':'loss','GB':'loss','TB':'win',
+    'LAR':'win','PHI':'loss','TEN':'win','BAL':'loss',
+    'MIA':'win','MIN':'loss','DEN':'loss','SF':'win',
+    'KC':'loss','LV':'win','LAC':'push','SEA':'push',
+    'DET':'loss','CAR':'win','ATL':'win','NO':'loss'
+  };
+  w4p.finalized = true;
+
   // Week 5: contest lines from Circa Million VIII
   var w5p = ensureWeek(5);
   var w5g = [
@@ -4612,6 +4625,19 @@ function seedHistoricalData() {
     w4.lines[g.home] = { spread: g.homeSpread, opponent: g.away, homeAway: 'home', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-02T00:00:00Z' };
     w4.lines[g.away] = { spread: g.awaySpread, opponent: g.home, homeAway: 'away', gameDate: g.date, source: 'Circa Contest', manual: true, lastUpdate: '2026-10-02T00:00:00Z' };
   });
+
+  // Week 4 ATS results vs Circa contest spreads
+  w4.results = {
+    'PIT':'loss','CLE':'win','IND':'win','WAS':'loss',
+    'NE':'win','BUF':'loss','NYJ':'loss','CHI':'win',
+    'ARI':'loss','NYG':'win','DAL':'win','HOU':'loss',
+    'JAX':'win','CIN':'loss','GB':'loss','TB':'win',
+    'LAR':'win','PHI':'loss','TEN':'win','BAL':'loss',
+    'MIA':'win','MIN':'loss','DEN':'loss','SF':'win',
+    'KC':'loss','LV':'win','LAC':'push','SEA':'push',
+    'DET':'loss','CAR':'win','ATL':'win','NO':'loss'
+  };
+  w4.finalized = true;
 
   // Week 5 contest lines from Circa Million VIII
   var w5 = ensureWeek(5);
