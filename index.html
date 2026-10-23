@@ -14,7 +14,7 @@
 <title>Circa Pool Manager — Syndicate Tool</title>
 <script>
 // Cache buster — forces reload when version changes
-(function(){var V='12';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
+(function(){var V='13';var u=new URL(window.location);if(u.searchParams.get('v')!==V){u.searchParams.set('v',V);window.location.replace(u.toString());}})();
 </script>
 <style>
 /* ═══ THEME VARIABLES ═══ */
@@ -449,7 +449,7 @@ tr:hover td{background:var(--bg3)}
 /* ═══════════════════════════════════════════════════════════
    SECTION 1: CONSTANTS & NFL TEAM DATA
    ═══════════════════════════════════════════════════════════ */
-const SEED_VERSION = 12;
+const SEED_VERSION = 13;
 const WEIGHTS = [5, 4, 3, 2, 1];
 const TOTAL_WEEKS = 18;
 const DEFAULT_MEMBERS = ['Errol', 'Marlon', 'DeMarlo', 'Alan', "D'"];
@@ -4083,11 +4083,13 @@ const SheetSync = {
           });
         }
         saveStateLocal();
-        this.updateIndicator('connected', 'Synced');
-        return true;
       }
-      if (data && data.error) throw new Error(data.error);
-      return false;
+      await Promise.allSettled([
+        this.pullContestLines(weekNum),
+        this.pullResults(weekNum)
+      ]);
+      this.updateIndicator('connected', 'Synced');
+      return true;
     } catch (err) {
       this.updateIndicator('error', 'Pull failed');
       console.error('Sync pull error:', err);
@@ -4125,6 +4127,10 @@ const SheetSync = {
           }
         }
         saveStateLocal();
+        await Promise.allSettled([
+          this.pullContestLines(S.currentWeek),
+          this.pullResults(S.currentWeek)
+        ]);
         this.lastSync = new Date().toISOString();
         this.connected = true;
         this.syncing = false;
@@ -4212,6 +4218,49 @@ const SheetSync = {
     } catch (err) {
       console.error('Dashboard pull error:', err);
       return null;
+    }
+  },
+
+  async pullContestLines(weekNum) {
+    if (!this.getUrl()) return false;
+    try {
+      const data = await this.apiGet('getContestLines', { week: weekNum });
+      if (data && data.lines && !data.error) {
+        const wk = ensureWeek(weekNum);
+        if (!wk.contestLines) wk.contestLines = {};
+        for (const teamId in data.lines) {
+          wk.contestLines[teamId] = {
+            spread: data.lines[teamId].spread,
+            lockedAt: new Date().toISOString(),
+            source: 'Circa Contest'
+          };
+        }
+        saveStateLocal();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Contest lines pull error:', err);
+      return false;
+    }
+  },
+
+  async pullResults(weekNum) {
+    if (!this.getUrl()) return false;
+    try {
+      const data = await this.apiGet('getResults', { week: weekNum });
+      if (data && data.results && !data.error) {
+        const wk = ensureWeek(weekNum);
+        for (const teamId in data.results) {
+          wk.results[teamId] = data.results[teamId];
+        }
+        saveStateLocal();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Results pull error:', err);
+      return false;
     }
   },
 
